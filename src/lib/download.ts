@@ -1,5 +1,17 @@
 import { DEFAULT_FILES } from '../defaults'
+import { isImageFile } from './files'
+import { dataUrlBytes, dataUrlMime } from './media'
 import { zipStore } from './zip'
+
+type ZipInput = { name: string; text?: string; bytes?: Uint8Array }
+
+function pack(name: string, path: string, text: string): ZipInput {
+  if (isImageFile(path)) {
+    const bytes = dataUrlBytes(text)
+    if (bytes) return { name, bytes }
+  }
+  return { name, text }
+}
 
 function viteIndex(userHtml: string, includeScript: boolean) {
   const hasDocument = /<html[\s>]/i.test(userHtml)
@@ -27,7 +39,7 @@ ${userHtml}
 
 export function downloadProject(files: Record<string, string>) {
   const includeScript = Boolean(files['script.js']?.trim())
-  const packed: { name: string; text: string }[] = [
+  const packed: ZipInput[] = [
     { name: 'react-playground/package.json', text: packageJson },
     { name: 'react-playground/vite.config.ts', text: viteConfig },
     { name: 'react-playground/tsconfig.json', text: tsconfig },
@@ -41,13 +53,13 @@ export function downloadProject(files: Record<string, string>) {
   ]
   for (const [path, text] of Object.entries(files)) {
     if (path === 'index.html' || path === 'tailwind.config.js') continue
-    packed.push({ name: `react-playground/src/${path}`, text })
+    packed.push(pack(`react-playground/src/${path}`, path, text))
   }
   saveBlob(zipStore(packed), 'react-playground.zip')
 }
 
 export function downloadWebProject(files: Record<string, string>) {
-  const packed = Object.entries(files).map(([path, text]) => ({ name: `web-project/${path}`, text: path === 'index.html' ? webIndex(text, files) : text }))
+  const packed = Object.entries(files).map(([path, text]) => pack(`web-project/${path}`, path, path === 'index.html' ? webIndex(text, files) : text))
   saveBlob(zipStore(packed), 'web-project.zip')
 }
 
@@ -82,7 +94,9 @@ export function saveBlob(blob: Blob, name: string) {
 }
 
 export function downloadFile(path: string, text: string) {
-  saveBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), path.split('/').pop() || 'file.txt')
+  const bytes = isImageFile(path) ? dataUrlBytes(text) : undefined
+  const blob = bytes ? new Blob([bytes], { type: dataUrlMime(text) }) : new Blob([text], { type: 'text/plain;charset=utf-8' })
+  saveBlob(blob, path.split('/').pop() || 'file.txt')
 }
 
 export function downloadFiles(files: Record<string, string>, folder = '') {
@@ -90,7 +104,7 @@ export function downloadFiles(files: Record<string, string>, folder = '') {
   const root = folder ? folder.split('/').pop()! : 'playground-files'
   const packed = Object.entries(files)
     .filter(([path]) => !prefix || path.startsWith(prefix))
-    .map(([path, text]) => ({ name: `${root}/${path.slice(prefix.length)}`, text }))
+    .map(([path, text]) => pack(`${root}/${path.slice(prefix.length)}`, path, text))
   saveBlob(zipStore(packed), `${root}.zip`)
   return packed.length
 }

@@ -2,7 +2,8 @@ import * as esbuild from 'esbuild-wasm/esm/browser.js'
 import wasmURL from 'esbuild-wasm/esbuild.wasm?url'
 import type { Problem } from '../types'
 import { readTailwindConfig } from './config'
-import { resolveImport } from './files'
+import { isImageFile, resolveImport } from './files'
+import { isDataUrl, textToSvgDataUrl } from './media'
 import { buildPreviewDocument, escapeScript, escapeStyle } from './preview'
 import { getTailwind, type TailwindApi } from './tailwindService'
 import type { WorkspaceId } from './workspace'
@@ -98,18 +99,22 @@ function virtualPlugin(files: Record<string, string>): esbuild.Plugin {
 }
 
 function pickEntry(files: Record<string, string>) {
-  for (const name of ['main.tsx', 'main.jsx', 'main.ts', 'main.js']) {
-    if (name in files) return { entry: name, files }
+  for (const dir of ['', 'src/']) {
+    for (const name of ['main.tsx', 'main.jsx', 'main.ts', 'main.js']) {
+      if (`${dir}${name}` in files) return { entry: `${dir}${name}`, files }
+    }
   }
-  for (const name of ['App.tsx', 'App.jsx', 'App.ts', 'App.js']) {
-    if (!(name in files)) continue
-    const stem = name.replace(/\.[^.]+$/, '')
-    return {
-      entry: VIRTUAL_ENTRY,
-      files: {
-        ...files,
-        [VIRTUAL_ENTRY]: `import { StrictMode } from 'react'\nimport { createRoot } from 'react-dom/client'\nimport App from './${stem}'\nconst el = document.getElementById('root')\nif (el) createRoot(el).render(<StrictMode><App /></StrictMode>)\n`,
-      },
+  for (const dir of ['', 'src/']) {
+    for (const name of ['App.tsx', 'App.jsx', 'App.ts', 'App.js']) {
+      if (!(`${dir}${name}` in files)) continue
+      const stem = `${dir}${name.replace(/\.[^.]+$/, '')}`
+      return {
+        entry: VIRTUAL_ENTRY,
+        files: {
+          ...files,
+          [VIRTUAL_ENTRY]: `import { StrictMode } from 'react'\nimport { createRoot } from 'react-dom/client'\nimport App from './${stem}'\nconst el = document.getElementById('root')\nif (el) createRoot(el).render(<StrictMode><App /></StrictMode>)\n`,
+        },
+      }
     }
   }
   return null
@@ -282,6 +287,33 @@ function localPath(url: string | undefined, files: Record<string, string>) {
   return { url, path: resolveImport('index.html', clean.startsWith('.') ? clean : `./${clean}`, (path) => path in files) }
 }
 
+function assetUrl(url: string | undefined, files: Record<string, string>) {
+  const target = localPath(url, files)
+  if (!target?.path) return undefined
+  const content = files[target.path]
+  if (isImageFile(target.path) && isDataUrl(content)) return content
+  if (target.path.endsWith('.svg')) return textToSvgDataUrl(content)
+  return undefined
+}
+
+function inlineAssets(html: string, files: Record<string, string>) {
+  let next = html.replace(/\b(src|poster)\s*=\s*(["'])([^"']*)\2/gi, (_full, attr: string, quote: string, url: string) => `${attr}=${quote}${assetUrl(url, files) ?? url}${quote}`)
+  next = next.replace(/\bsrcset\s*=\s*(["'])([^"']*)\1/gi, (_full, quote: string, list: string) => {
+    const parts = list.split(',').map((part) => {
+      const segment = part.trim()
+      if (!segment) return segment
+      const [url, ...descriptors] = segment.split(/\s+/)
+      return [assetUrl(url, files) ?? url, ...descriptors].join(' ')
+    })
+    return `srcset=${quote}${parts.join(', ')}${quote}`
+  })
+  return next
+}
+
+function inlineCssUrls(css: string, files: Record<string, string>) {
+  return css.replace(/\burl\(\s*(['"]?)([^'")]+)\1\s*\)/g, (_full, _quote: string, url: string) => `url("${assetUrl(url.trim(), files) ?? url}")`)
+}
+
 function lineAt(text: string, index: number) {
   return text.slice(0, index).split('\n').length
 }
@@ -370,7 +402,7 @@ async function compileWeb(files: Record<string, string>) {
   const api = tailwind ? await getTailwind(6000) : null
   const css = tailwind ? await compileCss(files, api, linkedCss.join('\n\n')) : { css: '', useCdn: false, problems: [] }
   problems.push(...css.problems)
-  const document = buildPreviewDocument({ html, css: css.css, appJs: '', vanillaJs: '', useCdn: css.useCdn, plain: true })
+  const document = buildPreviewDocument({ html: inlineAssets(html, files), css: inlineCssUrls(css.css, files), appJs: '', vanillaJs: '', useCdn: css.useCdn, plain: true })
   const ok = !problems.some((problem) => problem.severity === 'error' && problem.source === 'build')
   return { html: document, problems, ok, useCdn: css.useCdn }
 }
@@ -397,8 +429,8 @@ export async function compileProject(files: Record<string, string>, workspace: W
   problems.push(...css.problems)
   const blocking = problems.some((problem) => problem.severity === 'error' && problem.source === 'build')
   const html = buildPreviewDocument({
-    html: files['index.html'] ?? '<div id="root"></div>',
-    css: css.css,
+    html: inlineAssets(files['index.html'] ?? '<div id="root"></div>', files),
+    css: inlineCssUrls(css.css, files),
     appJs: blocking ? '' : appJs,
     vanillaJs: problems.some((problem) => problem.severity === 'error' && problem.file === 'script.js') ? '' : vanillaJs,
     useCdn: css.useCdn,

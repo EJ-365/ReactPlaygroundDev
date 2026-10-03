@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react'
-import { Check, RotateCcw, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { Check, CloudDownload, RefreshCw, RotateCcw, Search, X } from 'lucide-react'
+import { APP_VERSION } from '../lib/changelog'
 import { settingsStore, type FontChoice, type LineNumbers, type Settings } from '../lib/settings'
 import { THEMES, type ThemeDef } from '../lib/themes'
+import { updateStore } from '../lib/updates'
 
 type SettingRow = {
   id: keyof Settings
-  group: 'Workbench' | 'Files' | 'Formatting' | 'Editor' | 'Tags'
+  group: 'Workbench' | 'Files' | 'Formatting' | 'Editor' | 'Tags' | 'Updates'
   label: string
   description: string
   keywords: string
@@ -18,6 +20,7 @@ const ROWS: SettingRow[] = [
   { id: 'showHeader', group: 'Workbench', label: 'Show Top Header', description: 'Show the title bar with Run, Format, Share, and Download. Hide it for more editor space; press Ctrl+K H or the floating button to bring it back.', keywords: 'header title bar top hide show toolbar', control: 'toggle' },
   { id: 'autoSave', group: 'Files', label: 'Auto Save', description: 'Save every change to this browser automatically. When off, unsaved tabs show a dot and Ctrl+S saves.', keywords: 'auto save autosave persist storage dirty', control: 'toggle' },
   { id: 'formatOnSave', group: 'Formatting', label: 'Format On Save', description: 'Format the open file with Prettier when you press Ctrl+S.', keywords: 'format save prettier ctrl s', control: 'toggle' },
+  { id: 'formatOnPause', group: 'Formatting', label: 'Format After Delay', description: 'Format the open file with Prettier automatically about a second after you stop typing. If the code has a syntax error, nothing changes. Ctrl+Z undoes the format.', keywords: 'format pause idle typing prettier automatic formatonsave', control: 'toggle' },
   { id: 'formatSemicolons', group: 'Formatting', label: 'Semicolons', description: 'Add semicolons at the end of statements when formatting JS and TS.', keywords: 'prettier semicolon semi format', control: 'toggle' },
   { id: 'formatSingleQuote', group: 'Formatting', label: 'Single Quotes', description: "Use 'single' instead of \"double\" quotes when formatting JS and TS. JSX attributes keep double quotes.", keywords: 'prettier quotes single double format', control: 'toggle' },
   { id: 'formatPrintWidth', group: 'Formatting', label: 'Print Width', description: 'The line length Prettier tries to wrap code at.', keywords: 'prettier print width line length wrap format', control: 'width' },
@@ -51,6 +54,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [settings, setSettings] = useState(settingsStore.get)
   const [group, setGroup] = useState<'All' | SettingRow['group']>('All')
+  const updateStatus = useSyncExternalStore(updateStore.subscribe, updateStore.get)
 
   const patch = (next: Partial<Settings>) => {
     settingsStore.update(next)
@@ -66,14 +70,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-30 flex bg-editor text-fg" data-testid="settings-panel">
       <aside className="hidden w-52 shrink-0 border-r border-fg/10 p-3 sm:block">
         <p className="px-2 pb-2 text-[11px] uppercase tracking-[0.16em] text-muted/75">Settings</p>
-        {(['All', 'Workbench', 'Files', 'Formatting', 'Editor', 'Tags'] as const).map((item) => (
+        {(['All', 'Workbench', 'Files', 'Formatting', 'Editor', 'Tags', 'Updates'] as const).map((item) => (
           <button
             key={item}
             type="button"
             onClick={() => setGroup(item)}
-            className={`block w-full rounded-md px-2 py-1.5 text-left text-sm ${group === item ? 'bg-fg/10 text-fg' : 'text-muted hover:bg-fg/5 hover:text-fg'}`}
+            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${group === item ? 'bg-fg/10 text-fg' : 'text-muted hover:bg-fg/5 hover:text-fg'}`}
           >
             {item}
+            {item === 'Updates' && updateStatus === 'ready' && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
           </button>
         ))}
       </aside>
@@ -95,6 +100,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+          {(group === 'All' || group === 'Updates') && <UpdateCard />}
           {rows.map((row) => (
             <div key={row.id} className={`grid gap-3 border-b border-fg/5 py-4 ${row.control === 'theme' ? '' : 'sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center'}`}>
               <div>
@@ -107,6 +113,60 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           ))}
           {rows.length === 0 && <p className="py-10 text-center text-sm text-muted/75">No settings match that search.</p>}
         </div>
+      </div>
+    </div>
+  )
+}
+
+const UPDATE_TEXT: Record<string, string> = {
+  checking: 'Checking for the latest version…',
+  current: 'You are on the latest version.',
+  ready: 'A new version is ready. Update now to reload the app and apply it.',
+  unsupported: 'Update checks run in the installed or production app; the development server has no service worker.',
+  error: 'Could not reach the update service. Try again in a moment.',
+}
+
+function UpdateCard() {
+  const status = useSyncExternalStore(updateStore.subscribe, updateStore.get)
+  useEffect(() => {
+    if (status === 'idle') void updateStore.check()
+  }, [status])
+  return (
+    <div
+      data-testid="update-card"
+      className={`mb-3 grid gap-3 rounded-xl border p-4 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center ${status === 'ready' ? 'border-accent/40 bg-accent/10' : 'border-fg/10 bg-fg/[0.03]'}`}
+    >
+      <div>
+        <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted/75">
+          <CloudDownload size={13} className="text-accent" /> Updates
+        </p>
+        <p className="mt-0.5 text-sm text-fg">
+          Application Update <span className="ml-1 font-mono text-xs text-accent">v{APP_VERSION}</span>
+        </p>
+        <p className="mt-1 text-xs leading-5 text-muted">{UPDATE_TEXT[status] ?? 'Check whether a newer version is available.'}</p>
+      </div>
+      <div className="flex sm:justify-end">
+        {status === 'ready' ? (
+          <button
+            type="button"
+            data-testid="update-now"
+            onClick={() => void updateStore.apply()}
+            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accent-fg hover:brightness-110"
+          >
+            Update now
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-testid="update-check"
+            disabled={status === 'checking'}
+            onClick={() => void updateStore.check()}
+            className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-medium text-fg hover:bg-accent/20 disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={status === 'checking' ? 'animate-spin' : ''} />
+            {status === 'checking' ? 'Checking…' : 'Check for updates'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -224,10 +284,15 @@ function Control({ row, settings, onChange }: { row: SettingRow; settings: Setti
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={row.label}
       onClick={() => onChange({ [row.id]: !checked } as Partial<Settings>)}
-      className={`relative h-6 w-11 rounded-full ${checked ? 'bg-accent' : 'bg-fg/15'}`}
+      className={`relative h-6 w-11 shrink-0 justify-self-start rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-editor ${checked ? 'bg-accent hover:bg-accent/90' : 'bg-fg/20 hover:bg-fg/30'}`}
     >
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      <span
+        aria-hidden
+        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ${checked ? 'translate-x-[22px]' : 'translate-x-0'}`}
+      />
+      <span className="sr-only">{checked ? 'on' : 'off'}</span>
     </button>
   )
 }

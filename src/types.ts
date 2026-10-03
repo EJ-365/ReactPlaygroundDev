@@ -41,12 +41,13 @@ export type FileProblems = { errors: number; warnings: number }
 export type Device = 'desktop' | 'tablet' | 'phone'
 export type MobilePane = 'code' | 'preview' | 'console'
 export type ConsoleTab = 'problems' | 'output' | 'debug' | 'terminal'
+export type PanelLayout = 'bottom' | 'right' | 'full'
 
 export type EditorHandle = {
   setAll: (files: Record<string, string>, active: string) => void
   reveal: (path: string, line: number, column: number) => void
   replace: (path: string, value: string) => void
-  format: () => Promise<void>
+  format: (quiet?: boolean) => Promise<void>
   focus: () => void
   relayout: () => void
 }

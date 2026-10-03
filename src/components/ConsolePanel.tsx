@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { AlertTriangle, Bug, Minus, Plus, Square, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Bug, Maximize2, Minimize2, Minus, PanelBottom, PanelRight, Plus, Square, Trash2, X } from 'lucide-react'
 import { DEFAULT_SETTINGS, settingsStore } from '../lib/settings'
-import type { ConsoleEntry, ConsoleTab, Problem, Ser } from '../types'
+import type { ConsoleEntry, ConsoleTab, PanelLayout, Problem, Ser } from '../types'
 import type { RunHandle } from '../lib/nodeRunner'
 import { complete, execute, prompt, type Part, type ShellContext, type ShellIO, type Tone } from '../lib/terminal'
 
@@ -10,6 +10,8 @@ type Props = {
   problems: Problem[]
   tab: ConsoleTab
   preserve: boolean
+  layout: PanelLayout
+  onLayout: (layout: PanelLayout) => void
   shell: ShellContext
   onTab: (tab: ConsoleTab) => void
   onPreserve: (value: boolean) => void
@@ -102,6 +104,17 @@ export function ConsolePanel(props: Props) {
               <Trash2 size={14} />
             </IconButton>
           )}
+          <span className="hidden items-center sm:flex" role="group" aria-label="Panel layout">
+            <IconButton title="Move panel to bottom" onClick={() => props.onLayout('bottom')} active={props.layout === 'bottom'}>
+              <PanelBottom size={13} />
+            </IconButton>
+            <IconButton title="Move panel right" onClick={() => props.onLayout('right')} active={props.layout === 'right'}>
+              <PanelRight size={13} />
+            </IconButton>
+            <IconButton title={props.layout === 'full' ? 'Restore panel size' : 'Maximize panel'} onClick={() => props.onLayout(props.layout === 'full' ? 'bottom' : 'full')} active={props.layout === 'full'}>
+              {props.layout === 'full' ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </IconButton>
+          </span>
           {props.onClose && (
             <IconButton title="Close panel (Ctrl+J)" onClick={props.onClose}>
               <X size={14} />
@@ -117,9 +130,9 @@ export function ConsolePanel(props: Props) {
   )
 }
 
-function IconButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
+function IconButton({ title, onClick, active, children }: { title: string; onClick: () => void; active?: boolean; children: ReactNode }) {
   return (
-    <button type="button" title={title} aria-label={title} onClick={onClick} className="rounded-md p-1.5 text-muted hover:bg-fg/5 hover:text-fg">
+    <button type="button" title={title} aria-label={title} aria-pressed={active} onClick={onClick} className={`rounded-md p-1.5 ${active ? 'bg-fg/10 text-fg' : 'text-muted hover:bg-fg/5 hover:text-fg'}`}>
       {children}
     </button>
   )

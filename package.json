@@ -1,7 +1,7 @@
 {
   "name": "react-playground",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A free, open-source, VS Code-style frontend playground that runs in the browser.",
   "author": "Ejay Gabriel <eebudonihian@gmail.com>",
   "license": "MIT",

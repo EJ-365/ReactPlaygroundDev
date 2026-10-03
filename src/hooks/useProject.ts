@@ -8,19 +8,20 @@ import { externalPreviewWindow } from '../lib/previewWindow'
 import { statusStore } from '../lib/statusStore'
 import { WORKSPACES, workspaceStore } from '../lib/workspace'
 import { subscribeTailwind, tailwindReady } from '../lib/tailwindService'
-import type { ConsoleEntry, ConsoleLevel, ConsoleTab, Device, EditorHandle, MobilePane, Problem, Ser } from '../types'
+import type { ConsoleEntry, ConsoleLevel, ConsoleTab, Device, EditorHandle, MobilePane, PanelLayout, Problem, Ser } from '../types'
 
 const LAYOUT_KEY = 'react-playground.layout'
 
 function loadLayout() {
   try {
-    const data = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '') as { previewOpen?: boolean; consoleOpen?: boolean }
+    const data = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '') as { previewOpen?: boolean; consoleOpen?: boolean; panelLayout?: string }
     return {
       previewOpen: data.previewOpen !== false,
       consoleOpen: data.consoleOpen !== false,
+      panelLayout: (data.panelLayout === 'right' || data.panelLayout === 'full' ? data.panelLayout : 'bottom') as PanelLayout,
     }
   } catch {
-    return { previewOpen: true, consoleOpen: true }
+    return { previewOpen: true, consoleOpen: true, panelLayout: 'bottom' as PanelLayout }
   }
 }
 
@@ -57,6 +58,7 @@ export function useProject() {
 
   const [paths, setPaths] = useState(() => Object.keys(filesRef.current))
   const [folders, setFolders] = useState(() => stored.current?.folders ?? [])
+  const [name, setName] = useState<string | undefined>(() => stored.current?.name)
   const [openTabs, setOpenTabs] = useState(() => withPinnedTabs(stored.current?.openTabs ?? WORKSPACES[workspace].defaults().openTabs, Object.keys(filesRef.current)))
   const [active, setActive] = useState(() => stored.current?.active ?? WORKSPACES[workspace].defaults().active)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -72,13 +74,16 @@ export function useProject() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [dialog, setDialog] = useState<ProjectDialog>(null)
   const [preserveLog, setPreserveLog] = useState(false)
+  const [panelLayout, setPanelLayout] = useState<PanelLayout>(() => loadLayout().panelLayout)
   const tabsRef = useRef(openTabs)
   const activeRef = useRef(active)
   const foldersRef = useRef(folders)
+  const nameRef = useRef(name)
   const persistTimer = useRef(0)
   tabsRef.current = openTabs
   activeRef.current = active
   foldersRef.current = folders
+  nameRef.current = name
 
   preserveRef.current = preserveLog
 
@@ -89,7 +94,7 @@ export function useProject() {
 
   const save = useCallback(() => {
     window.clearTimeout(persistTimer.current)
-    saveProject({ files: filesRef.current, openTabs: tabsRef.current, active: activeRef.current, folders: foldersRef.current }, workspace)
+    saveProject({ files: filesRef.current, openTabs: tabsRef.current, active: activeRef.current, folders: foldersRef.current, name: nameRef.current }, workspace)
     setUnsaved((current) => (current.size ? new Set() : current))
     setSavedAt(Date.now())
   }, [workspace])
@@ -239,11 +244,11 @@ export function useProject() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ previewOpen, consoleOpen }))
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify({ previewOpen, consoleOpen, panelLayout }))
     } catch {
       // Layout still applies for this session.
     }
-  }, [previewOpen, consoleOpen])
+  }, [previewOpen, consoleOpen, panelLayout])
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -396,6 +401,34 @@ export function useProject() {
     [commitFiles],
   )
 
+  const move = useCallback(
+    (from: string, destFolder: string) => {
+      const base = from.split('/').pop() ?? ''
+      const to = destFolder ? `${destFolder}/${base}` : base
+      if (!base || to === from) return
+      if (filesRef.current[from] != null) {
+        if (!canRename(from)) {
+          statusStore.flash('Pinned files cannot be moved', 2500)
+          return
+        }
+        if (!isValidFileName(to) || filesRef.current[to] != null || foldersRef.current.includes(to)) {
+          statusStore.flash(`${to} already exists`, 2500)
+          return
+        }
+        const moves = new Map([[from, to]])
+        const nextFiles = moveFiles(filesRef.current, moves)
+        const nextTabs = tabsRef.current.map((tab) => moves.get(tab) ?? tab)
+        const nextActive = moves.get(activeRef.current) ?? activeRef.current
+        setFolders((prev) => uniqueFolders([...prev, ...parentFolders(to)]))
+        commitFiles(nextFiles, nextActive, nextTabs)
+        statusStore.flash(`Moved ${from} to ${to}`)
+        return
+      }
+      if (foldersRef.current.includes(from)) renameFolder(from, to)
+    },
+    [commitFiles, renameFolder],
+  )
+
   const deleteFolder = useCallback(
     (folder: string) => {
       if (!isValidFolderName(folder)) return
@@ -417,6 +450,7 @@ export function useProject() {
   const reset = useCallback(() => {
     clearProject(workspace)
     setUnsaved(new Set())
+    setName(undefined)
     const fresh = WORKSPACES[workspace].defaults()
     filesRef.current = fresh.files
     const nextPaths = Object.keys(filesRef.current)
@@ -448,10 +482,48 @@ export function useProject() {
       setBuildProblems([])
       setMarkers([])
       setUnsaved(new Set())
+      setName(next.name)
       lastError.current = ''
       setDialog(null)
-      saveProject({ files: filesRef.current, openTabs: nextTabs, active: nextActive, folders: nextFolders }, workspace)
+      saveProject({ files: filesRef.current, openTabs: nextTabs, active: nextActive, folders: nextFolders, name: next.name }, workspace)
       editorRef.current?.setAll(filesRef.current, nextActive)
+      schedule(true)
+    },
+    [schedule, workspace],
+  )
+
+  const loadImported = useCallback(
+    (incoming: Incoming[], projectName: string) => {
+      if (!incoming.length) return
+      const nextFiles: Record<string, string> = {}
+      for (const file of incoming) nextFiles[file.path] = file.text
+      const info = WORKSPACES[workspace]
+      const defaults = info.defaults().files
+      for (const pinned of info.pinned) {
+        if (nextFiles[pinned] == null) nextFiles[pinned] = defaults[pinned]
+      }
+      filesRef.current = nextFiles
+      const nextPaths = Object.keys(nextFiles)
+      const nextFolders = uniqueFolders(nextPaths.flatMap((path) => parentFolders(path)))
+      const entry =
+        nextPaths.find((path) => /(^|\/)main\.(tsx|jsx|ts|js)$/.test(path)) ??
+        nextPaths.find((path) => /(^|\/)App\.(tsx|jsx|ts|js)$/.test(path)) ??
+        nextPaths.find((path) => /\.(tsx|jsx|ts|js|html)$/.test(path)) ??
+        nextPaths[0]
+      const nextTabs = withPinnedTabs([entry], nextPaths)
+      setPaths(nextPaths)
+      setFolders(nextFolders)
+      setOpenTabs(nextTabs)
+      setActive(entry)
+      setName(projectName)
+      setEntries([])
+      setBuildProblems([])
+      setMarkers([])
+      setUnsaved(new Set())
+      lastError.current = ''
+      setDialog(null)
+      saveProject({ files: nextFiles, openTabs: nextTabs, active: entry, folders: nextFolders, name: projectName }, workspace)
+      editorRef.current?.setAll(nextFiles, entry)
       schedule(true)
     },
     [schedule, workspace],
@@ -522,6 +594,7 @@ export function useProject() {
     workspace,
     paths,
     folders,
+    name,
     openTabs,
     active,
     setActive,
@@ -546,6 +619,8 @@ export function useProject() {
     setDialog,
     preserveLog,
     setPreserveLog,
+    panelLayout,
+    setPanelLayout,
     editorRef,
     iframeRef,
     getFiles,
@@ -557,6 +632,7 @@ export function useProject() {
     createFolder,
     renameFile,
     renameFolder,
+    move,
     deleteFile,
     deleteFolder,
     reset,
@@ -566,6 +642,7 @@ export function useProject() {
     unsaved,
     savedAt,
     importFiles,
+    loadImported,
     openProject,
     clearConsole,
     evalInPreview,

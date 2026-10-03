@@ -1,6 +1,7 @@
 import { workspaceStore } from './workspace'
 
-export const TEXT_EXTENSIONS = ['tsx', 'ts', 'jsx', 'js', 'mjs', 'cjs', 'css', 'scss', 'sass', 'less', 'html', 'htm', 'json', 'md', 'mdx', 'txt', 'svg', 'xml', 'yml', 'yaml', 'vue', 'svelte', 'py', 'c', 'h', 'cpp', 'cc', 'cxx', 'c++', 'hpp', 'hh', 'hxx', 'cs', 'java', 'go', 'rs', 'php', 'rb', 'sh', 'sql', 'graphql'] as const
+export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'avif'] as const
+export const TEXT_EXTENSIONS = ['tsx', 'ts', 'jsx', 'js', 'mjs', 'cjs', 'css', 'scss', 'sass', 'less', 'html', 'htm', 'json', 'md', 'mdx', 'txt', 'svg', 'xml', 'yml', 'yaml', 'vue', 'svelte', 'py', 'c', 'h', 'cpp', 'cc', 'cxx', 'c++', 'hpp', 'hh', 'hxx', 'cs', 'java', 'go', 'rs', 'php', 'rb', 'sh', 'sql', 'graphql', ...IMAGE_EXTENSIONS] as const
 const FILE_RE = new RegExp(`^(?:[A-Za-z0-9._-]+\\/)*[A-Za-z0-9._-]+\\.(${TEXT_EXTENSIONS.map((ext) => ext.replace(/\+/g, '\\+')).join('|')})$`)
 
 const MONACO_LANGUAGES: Record<string, [string, string]> = {
@@ -39,10 +40,15 @@ const MONACO_LANGUAGES: Record<string, [string, string]> = {
   sql: ['SQL', 'sql'],
   graphql: ['GraphQL', 'graphql'],
 }
-const EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json']
+const EXTENSIONS = ['.tsx', '.ts', '.jsx', '.js', '.css', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.avif']
 
 export function isDocFile(path: string) {
   return workspaceStore.info().pinned.includes(path)
+}
+
+export function isImageFile(path: string) {
+  const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  return (IMAGE_EXTENSIONS as readonly string[]).includes(ext)
 }
 
 export function fileMeta(name: string) {
@@ -53,6 +59,7 @@ export function fileMeta(name: string) {
   if (name.endsWith('.css')) return { language: 'CSS', monaco: 'css', label: 'CSS', color: '#7cb7ff' }
   if (name.endsWith('.html')) return { language: 'HTML', monaco: 'html', label: 'HTML', color: '#f0924a' }
   const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase()
+  if ((IMAGE_EXTENSIONS as readonly string[]).includes(ext)) return { language: 'Image', monaco: 'plaintext', label: ext.toUpperCase(), color: '#26a69a' }
   const known = MONACO_LANGUAGES[ext]
   if (known) return { language: known[0], monaco: known[1], label: ext.toUpperCase(), color: '#94a3b8' }
   return { language: 'Plain text', monaco: 'plaintext', label: 'TXT', color: '#94a3b8' }

@@ -1,5 +1,5 @@
 import { DEFAULT_FILES } from '../defaults'
-import { isValidFileName, isValidFolderName, withPinnedTabs } from './files'
+import { isImageFile, isValidFileName, isValidFolderName, withPinnedTabs } from './files'
 import { WORKSPACES, workspaceStore, type WorkspaceId } from './workspace'
 
 export type SavedProject = {
@@ -7,6 +7,7 @@ export type SavedProject = {
   openTabs: string[]
   active: string
   folders: string[]
+  name?: string
 }
 
 const LEGACY_MAIN = `import { createRoot } from 'react-dom/client'
@@ -58,7 +59,7 @@ function linkWebFiles(html: string, files: Record<string, string>) {
 function sanitize(files: Record<string, unknown>, workspace: WorkspaceId) {
   const next: Record<string, string> = {}
   for (const [name, value] of Object.entries(files)) {
-    if (typeof value === 'string' && isValidFileName(name) && value.length < 250_000) next[name] = value
+    if (typeof value === 'string' && isValidFileName(name) && value.length < (isImageFile(name) ? 2_100_000 : 250_000)) next[name] = value
   }
   const defaults = WORKSPACES[workspace].defaults().files
   for (const name of WORKSPACES[workspace].pinned) {
@@ -85,7 +86,8 @@ export function loadProject(workspace: WorkspaceId = workspaceStore.get()): Save
     const openTabs = withPinnedTabs(Array.isArray(data.openTabs) ? data.openTabs.filter((tab) => typeof tab === 'string') : fallback.openTabs, paths, info.pinned)
     const active = typeof data.active === 'string' && files[data.active] != null ? data.active : openTabs[0] ?? fallback.active
     const folders = Array.isArray(data.folders) ? data.folders.filter((folder): folder is string => typeof folder === 'string' && isValidFolderName(folder)) : []
-    return { files, openTabs, active, folders }
+    const name = typeof data.name === 'string' && data.name ? data.name : undefined
+    return { files, openTabs, active, folders, name }
   } catch {
     return null
   }

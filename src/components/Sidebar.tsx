@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ChevronRight, ChevronsDownUp, Download, FilePlus, FileUp, Folder, FolderOpen, FolderPlus, FolderUp, Pencil, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { ChevronRight, ChevronsDownUp, ClipboardCopy, Download, FilePlus, FileUp, Folder, FolderOpen, FolderPlus, FolderUp, Pencil, SquareArrowOutUpRight, Trash2 } from 'lucide-react'
 import { canRename, fileTree, folderChain, isDocFile, isValidFileName, isValidFolderName, parentFolders, type TreeNode } from '../lib/files'
+import { copyText } from '../lib/share'
+import { statusStore } from '../lib/statusStore'
 import type { FileProblems } from '../types'
+import { ContextMenu, menuEvent, type MenuItem, type MenuState } from './ContextMenu'
 import { FileIcon } from './FileIcon'
 
 type Props = {
@@ -16,6 +19,7 @@ type Props = {
   onCreate: (folder?: string) => void
   onCreateFolder: (parent?: string) => void
   onRename: (path: string, kind: 'file' | 'folder') => void
+  onMove: (path: string, destFolder: string) => void
   onUploadFiles: () => void
   onUploadFolder: () => void
   onDownloadFile: (path: string) => void
@@ -27,14 +31,22 @@ type Props = {
 }
 
 type Creating = { kind: 'file' | 'folder'; parent: string }
+type MenuTarget = { kind: 'file' | 'folder'; path: string }
 
 type Actions = Omit<Props, 'root' | 'folders' | 'active' | 'onUploadFiles' | 'onUploadFolder'> & {
   active: string
   collapsed: Set<string>
+  dropAt: string | null
   onToggle: (path: string) => void
+  onMenu: (event: ReactMouseEvent, target: MenuTarget) => void
+  onDragStart: (event: ReactDragEvent, path: string) => void
+  onDragEnd: () => void
+  onDragOver: (event: ReactDragEvent, target: string) => void
+  onDrop: (event: ReactDragEvent, dest: string) => void
 }
 
 const COLLAPSED_KEY = 'react-playground.collapsed'
+const DRAG_MIME = 'application/x-playground-node'
 
 function loadCollapsed() {
   try {
@@ -54,9 +66,20 @@ function saveCollapsed(collapsed: Set<string>) {
   }
 }
 
-export function Sidebar({ root, paths, folders, active, fileProblems, onOpen, onDelete, onDeleteFolder, onCreate, onCreateFolder, onRename, onUploadFiles, onUploadFolder, onDownloadFile, onDownloadFolder, creating, folderNames, onCreateSubmit, onCreateCancel }: Props) {
+function parentOf(path: string) {
+  return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
+}
+
+async function copyPath(path: string) {
+  statusStore.flash((await copyText(path)) ? 'Path copied' : path)
+}
+
+export function Sidebar({ root, paths, folders, active, fileProblems, onOpen, onDelete, onDeleteFolder, onCreate, onCreateFolder, onRename, onMove, onUploadFiles, onUploadFolder, onDownloadFile, onDownloadFolder, creating, folderNames, onCreateSubmit, onCreateCancel }: Props) {
   const tree = fileTree(paths, folders)
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const [dropAt, setDropAt] = useState<string | null>(null)
+  const dragging = useRef('')
 
   const update = (next: Set<string>) => {
     setCollapsed(next)
@@ -107,7 +130,78 @@ export function Sidebar({ root, paths, folders, active, fileProblems, onOpen, on
     update(all)
   }
 
-  const actions: Actions = { active, fileProblems, collapsed, onToggle, onOpen, onDelete, onDeleteFolder, onCreate, onCreateFolder, onRename, onDownloadFile, onDownloadFolder, paths, creating, folderNames, onCreateSubmit, onCreateCancel }
+  const rootMenu = (event: ReactMouseEvent) => {
+    event.preventDefault()
+    const items: MenuItem[] = [
+      { label: 'New File…', hint: 'Alt+N', icon: <FilePlus size={13} />, onClick: () => onCreate() },
+      { label: 'New Folder…', hint: 'Alt+Shift+N', icon: <FolderPlus size={13} />, onClick: () => onCreateFolder() },
+      'separator',
+      { label: 'Upload Files…', icon: <FileUp size={13} />, onClick: onUploadFiles },
+      { label: 'Upload Folder…', icon: <FolderUp size={13} />, onClick: onUploadFolder },
+      'separator',
+      { label: 'Collapse Folders in Explorer', icon: <ChevronsDownUp size={13} />, onClick: collapseAll },
+    ]
+    setMenu(menuEvent(event, items))
+  }
+
+  const onMenu = (event: ReactMouseEvent, target: MenuTarget) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const parent = parentOf(target.path)
+    const items: MenuItem[] =
+      target.kind === 'folder'
+        ? [
+            { label: 'New File…', icon: <FilePlus size={13} />, onClick: () => onCreate(target.path) },
+            { label: 'New Folder…', icon: <FolderPlus size={13} />, onClick: () => onCreateFolder(target.path) },
+            'separator',
+            { label: 'Copy Path', icon: <ClipboardCopy size={13} />, onClick: () => void copyPath(target.path) },
+            { label: 'Download (.zip)', icon: <Download size={13} />, onClick: () => onDownloadFolder(target.path) },
+            'separator',
+            { label: 'Rename…', hint: 'F2', icon: <Pencil size={13} />, onClick: () => onRename(target.path, 'folder') },
+            { label: 'Delete', icon: <Trash2 size={13} />, danger: true, onClick: () => onDeleteFolder(target.path) },
+          ]
+        : [
+            { label: 'Open', icon: <SquareArrowOutUpRight size={13} />, onClick: () => onOpen(target.path) },
+            'separator',
+            { label: 'New File…', icon: <FilePlus size={13} />, onClick: () => onCreate(parent) },
+            { label: 'New Folder…', icon: <FolderPlus size={13} />, onClick: () => onCreateFolder(parent) },
+            'separator',
+            { label: 'Copy Path', icon: <ClipboardCopy size={13} />, onClick: () => void copyPath(target.path) },
+            { label: 'Download', icon: <Download size={13} />, onClick: () => onDownloadFile(target.path) },
+            'separator',
+            { label: 'Rename…', hint: 'F2', icon: <Pencil size={13} />, disabled: !canRename(target.path), onClick: () => onRename(target.path, 'file') },
+            { label: 'Delete', icon: <Trash2 size={13} />, danger: true, disabled: isDocFile(target.path), onClick: () => onDelete(target.path) },
+          ]
+    setMenu(menuEvent(event, items))
+  }
+
+  const onDragStart = (event: ReactDragEvent, path: string) => {
+    dragging.current = path
+    event.dataTransfer.setData(DRAG_MIME, path)
+    event.dataTransfer.effectAllowed = 'move'
+  }
+  const onDragEnd = () => {
+    dragging.current = ''
+    setDropAt(null)
+  }
+  const onDragOver = (event: ReactDragEvent, target: string) => {
+    if (!event.dataTransfer.types.includes(DRAG_MIME)) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'move'
+    if (dropAt !== target) setDropAt(target)
+  }
+  const onDrop = (event: ReactDragEvent, dest: string) => {
+    if (!event.dataTransfer.types.includes(DRAG_MIME)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const path = event.dataTransfer.getData(DRAG_MIME) || dragging.current
+    setDropAt(null)
+    dragging.current = ''
+    if (path) onMove(path, dest)
+  }
+
+  const actions: Actions = { active, fileProblems, collapsed, dropAt, onToggle, onOpen, onDelete, onDeleteFolder, onCreate, onCreateFolder, onRename, onMove, onDownloadFile, onDownloadFolder, paths, creating, folderNames, onCreateSubmit, onCreateCancel, onMenu, onDragStart, onDragEnd, onDragOver, onDrop }
 
   return (
     <div className="flex h-full w-full flex-col bg-sidebar">
@@ -121,14 +215,23 @@ export function Sidebar({ root, paths, folders, active, fileProblems, onOpen, on
           <HeaderButton title="Collapse folders" onClick={collapseAll} icon={<ChevronsDownUp size={15} />} />
         </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto pb-4">
-        <Section id="::root" label={root} collapsed={collapsed} onToggle={onToggle}>
+      <div
+        className="min-h-0 flex-1 overflow-auto pb-4"
+        onContextMenu={rootMenu}
+        onDragOver={(event) => onDragOver(event, '::root')}
+        onDrop={(event) => onDrop(event, '')}
+        onDragLeave={(event) => {
+          if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDropAt(null)
+        }}
+      >
+        <Section id="::root" label={root} collapsed={collapsed} onToggle={onToggle} highlight={dropAt === '::root'}>
           {creating?.parent === '' && <CreateRow creating={creating} depth={0} actions={actions} />}
           {tree.map((node) => (
             <NodeRow key={node.path} node={node} depth={0} actions={actions} />
           ))}
         </Section>
       </div>
+      {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </div>
   )
 }
@@ -141,7 +244,7 @@ function HeaderButton({ title, onClick, icon }: { title: string; onClick: () => 
   )
 }
 
-function Section({ id, label, collapsed, onToggle, children }: { id: string; label: string; collapsed: Set<string>; onToggle: (id: string) => void; children: ReactNode }) {
+function Section({ id, label, collapsed, onToggle, highlight, children }: { id: string; label: string; collapsed: Set<string>; onToggle: (id: string) => void; highlight?: boolean; children: ReactNode }) {
   const open = !collapsed.has(id)
   return (
     <div className="mb-1">
@@ -149,7 +252,7 @@ function Section({ id, label, collapsed, onToggle, children }: { id: string; lab
         type="button"
         aria-expanded={open}
         onClick={() => onToggle(id)}
-        className="flex w-full items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted/60 hover:text-fg"
+        className={`flex w-full items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] hover:text-fg ${highlight ? 'bg-accent/15 text-fg' : 'text-muted/60'}`}
       >
         <ChevronRight size={12} className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
         {label}
@@ -177,7 +280,9 @@ function NodeRow({ node, depth, actions }: { node: TreeNode; depth: number; acti
           role="treeitem"
           aria-expanded={open}
           tabIndex={0}
+          draggable
           data-testid={`folder-${node.path}`}
+          data-drop-target={node.path}
           onClick={() => actions.onToggle(node.path)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -186,7 +291,14 @@ function NodeRow({ node, depth, actions }: { node: TreeNode; depth: number; acti
             }
           }}
           onDoubleClick={(event) => event.preventDefault()}
-          className="group flex cursor-pointer select-none items-center gap-1 py-1 pr-1 text-[13px] text-fg/80 outline-none hover:bg-fg/5 focus-visible:ring-1 focus-visible:ring-accent/60"
+          onContextMenu={(event) => actions.onMenu(event, { kind: 'folder', path: node.path })}
+          onDragStart={(event) => actions.onDragStart(event, node.path)}
+          onDragEnd={actions.onDragEnd}
+          onDragOver={(event) => actions.onDragOver(event, node.path)}
+          onDrop={(event) => actions.onDrop(event, node.path)}
+          className={`group flex cursor-pointer select-none items-center gap-1 py-1 pr-1 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-accent/60 ${
+            actions.dropAt === node.path ? 'bg-accent/20 text-fg' : 'text-fg/80 hover:bg-fg/5'
+          }`}
           style={{ paddingLeft: 8 + depth * 12 }}
         >
           <ChevronRight size={13} className={`shrink-0 text-muted transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
@@ -216,19 +328,7 @@ function NodeRow({ node, depth, actions }: { node: TreeNode; depth: number; acti
       </div>
     )
   }
-  return (
-    <FileRow
-      path={node.path}
-      name={node.name}
-      depth={depth}
-      active={actions.active === node.path}
-      problems={actions.fileProblems[node.path]}
-      onOpen={actions.onOpen}
-      onDelete={actions.onDelete}
-      onDownload={actions.onDownloadFile}
-      onRename={canRename(node.path) ? () => actions.onRename(node.path, 'file') : undefined}
-    />
-  )
+  return <FileRow path={node.path} name={node.name} depth={depth} active={actions.active === node.path} problems={actions.fileProblems[node.path]} actions={actions} />
 }
 
 function CreateRow({ creating, depth, actions }: { creating: Creating; depth: number; actions: Actions }) {
@@ -322,9 +422,19 @@ function folderProblems(files: Record<string, FileProblems>, folder: string): Fi
   return errors || warnings ? { errors, warnings } : undefined
 }
 
-function FileRow({ path, name, depth, active, problems, onOpen, onDelete, onRename, onDownload }: { path: string; name: string; depth: number; active: boolean; problems?: FileProblems; onOpen: (path: string) => void; onDelete?: (path: string) => void; onRename?: () => void; onDownload: (path: string) => void }) {
+function FileRow({ path, name, depth, active, problems, actions }: { path: string; name: string; depth: number; active: boolean; problems?: FileProblems; actions: Actions }) {
+  const parent = parentOf(path)
+  const onOpen = actions.onOpen
+  const onDelete = actions.onDelete
+  const onRename = canRename(path) ? () => actions.onRename(path, 'file') : undefined
   return (
     <div
+      draggable
+      onDragStart={(event) => actions.onDragStart(event, path)}
+      onDragEnd={actions.onDragEnd}
+      onDragOver={(event) => actions.onDragOver(event, parent)}
+      onDrop={(event) => actions.onDrop(event, parent)}
+      onContextMenu={(event) => actions.onMenu(event, { kind: 'file', path })}
       className={`group relative flex w-full items-center text-[13px] ${active ? 'bg-accent/15 text-fg' : 'text-fg/80 hover:bg-fg/5'}`}
       style={{ paddingLeft: 12 + depth * 12 }}
     >
@@ -339,7 +449,7 @@ function FileRow({ path, name, depth, active, problems, onOpen, onDelete, onRena
         )}
       </button>
       <span className="flex shrink-0 pr-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <Icon action={`Download ${path}`} onClick={() => onDownload(path)} icon={<Download size={12} />} />
+        <Icon action={`Download ${path}`} onClick={() => actions.onDownloadFile(path)} icon={<Download size={12} />} />
         {onRename && <Icon action={`Rename ${path}`} onClick={onRename} icon={<Pencil size={12} />} />}
         {onDelete && !isDocFile(path) && <Icon action={`Delete ${path}`} onClick={() => onDelete(path)} icon={<Trash2 size={12} />} />}
       </span>

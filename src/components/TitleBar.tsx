@@ -4,6 +4,7 @@ import { Logo } from './Logo'
 import { installStore } from '../lib/install'
 import { statusStore } from '../lib/statusStore'
 import { WORKSPACES, type WorkspaceId } from '../lib/workspace'
+import { WhatsNew } from './WhatsNew'
 
 type Props = {
   onRun: () => void
@@ -76,6 +77,7 @@ export function TitleBar({ onRun, onFormat, onReset, onToggleSidebar, onTogglePr
         <IconButton title="Toggle preview" label="Toggle preview" active={previewOpen} onClick={onTogglePreview} icon={<Eye size={15} />} />
         <IconButton title="Toggle console (Ctrl+J)" label="Toggle console" active={consoleOpen} onClick={onToggleConsole} icon={<PanelBottom size={15} />} />
         <IconButton title="Copy share link" label="Copy share link" onClick={onShare} icon={<Share2 size={15} />} />
+        <WhatsNew />
         <IconButton title="Download project (Ctrl+Alt+S)" label="Download project" onClick={onDownload} icon={<Download size={15} />} />
         <IconButton title="Keyboard shortcuts (Ctrl+K Ctrl+S)" label="Keyboard shortcuts" onClick={onShortcuts} icon={<Keyboard size={15} />} />
         {compact && <IconButton title="Color theme (Ctrl+K Ctrl+T)" label="Color theme" onClick={onThemes} icon={<Palette size={15} />} />}

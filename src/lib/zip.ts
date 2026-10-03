@@ -22,11 +22,11 @@ function u32(view: DataView, offset: number, value: number) {
   view.setUint32(offset, value, true)
 }
 
-export function zipStore(files: { name: string; text: string }[]) {
+export function zipStore(files: { name: string; text?: string; bytes?: Uint8Array }[]) {
   const encoder = new TextEncoder()
   const entries = files.map((file) => {
     const name = encoder.encode(file.name.replace(/\\/g, '/'))
-    const data = encoder.encode(file.text)
+    const data = file.bytes ?? encoder.encode(file.text ?? '')
     return { name, data, crc: crc32(data) }
   })
   const localSize = entries.reduce((sum, entry) => sum + 30 + entry.name.length + entry.data.length, 0)

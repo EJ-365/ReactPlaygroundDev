@@ -84,6 +84,7 @@ createRoot(document.getElementById('root')!).render(<App />)`}</Code>
                 ['App.tsx', 'TSX: runs, React 19'],
                 ['data.json', 'JSON: importable as a module'],
                 ['README.md', 'Markdown, SVG, YAML, text: editable'],
+                ['logo.png', 'Images (PNG, JPG, GIF…): open in the viewer'],
                 ['main.cpp', 'C/C++, Python, Java, Go, Rust, PHP…: highlighted only'],
                 ['theme.scss', 'SCSS, Less, Vue, Svelte: highlighted only'],
               ].map(([path, label]) => (
@@ -100,8 +101,9 @@ createRoot(document.getElementById('root')!).render(<App />)`}</Code>
               <li>Auto-import: type <code>useSt</code> and pick <code>useState</code> (it shows <code>react</code> next to it). The import is added at the top, or merged into an existing <code>import {'{ … }'} from 'react'</code>. Works for React hooks and APIs, <code>react-dom</code>, and anything exported from your own files.</li>
               <li>Unused variables, parameters, and imports are dimmed like in VS Code. Hover one to see why.</li>
               <li>Picking an attribute in JSX inserts its value too: <code>className=""</code> with the cursor inside the quotes (and Tailwind suggestions open), or <code>onClick={'{}'}</code> for events and non-string props. HTML attributes get <code>class=""</code> the same way.</li>
-              <li>Emmet: type <code>h2</code>, <code>ul&gt;li.item*3</code>, or <code>div.card&gt;h2+p</code>, then press <Kbd>Enter</Kbd> on the Emmet suggestion or <Kbd>Tab</Kbd> (HTML, JSX, TSX, CSS).</li>
-              <li>Suggestions appear as you type everywhere (JavaScript, TypeScript, JSX markup, HTML, CSS, Tailwind classes). <Kbd>Enter</Kbd> or <Kbd>Tab</Kbd> inserts the highlighted one; <Kbd>Esc</Kbd> closes the list. In JavaScript nothing fills in on its own: no ghost text, and punctuation never accepts. Change this under <em>Settings → JavaScript Suggestions</em>.</li>
+              <li>Emmet: type <code>h2</code>, <code>ul&gt;li.item*3</code>, or <code>div.card&gt;h2+p</code>, then press <Kbd>Enter</Kbd> on the Emmet suggestion or <Kbd>Tab</Kbd> (HTML, JSX, TSX, CSS). A tag name also expands on <Kbd>Enter</Kbd>: type <code>p</code> inside markup and get <code>&lt;p&gt;&lt;/p&gt;</code> with the cursor inside; <code>p.note</code> and <code>main#app</code> add the class and id attributes (className in JSX/TSX). Only real element names expand — standard HTML tags, SVG elements, hyphenated custom elements such as <code>my-card</code>, and capitalized component names in JSX/TSX. Ordinary words like <code>hi</code> just make a new line.</li>
+              <li>Suggestions appear as you type everywhere (JavaScript, TypeScript, JSX markup, HTML, CSS, Tailwind classes), plus word-based suggestions that reuse identifiers and text already in the file. <Kbd>Enter</Kbd> or <Kbd>Tab</Kbd> inserts the highlighted one; <Kbd>Esc</Kbd> closes the list. In JavaScript nothing fills in on its own: no ghost text, and punctuation never accepts. Change this under <em>Settings → JavaScript Suggestions</em>.</li>
+              <li>Right-click the editor for a context menu: Run Preview, Format Document, Reveal in Explorer, Copy Path, Download File, Toggle Word Wrap, and the usual cut/copy/paste and Monaco commands.</li>
               <li>React snippets: <code>rfc</code>, <code>rafce</code>, <code>us</code> (useState), <code>ue</code> (useEffect), <code>ur</code>, <code>um</code>, <code>ucb</code>, <code>jmap</code>, <code>clg</code>.</li>
               <li>Go to definition: <Kbd>Ctrl</Kbd>+click a component, function, or import (or press <Kbd>F12</Kbd>) to open the file where it is defined. Works across <code>.js</code>, <code>.jsx</code>, <code>.ts</code>, and <code>.tsx</code> files.</li>
               <li>Files with errors turn red in the Explorer with an error count (yellow for warnings), and folders containing them get a dot. Error positions also show as marks on the editor scrollbar.</li>
@@ -113,13 +115,17 @@ createRoot(document.getElementById('root')!).render(<App />)`}</Code>
 
           <Section id="formatting" title="Formatting">
             <p>Press <Kbd>Shift</Kbd> <Kbd>Alt</Kbd> <Kbd>F</Kbd>, click <em>Format</em> in the header, or right-click → <em>Format Document (Prettier)</em>. Prettier formats HTML, CSS, JavaScript, TypeScript, JSX, and TSX. If your code has a syntax error the status bar shows why and nothing changes. Undo with <Kbd>Ctrl</Kbd> <Kbd>Z</Kbd>.</p>
-            <p>In <em>Settings → Formatting</em> choose Format On Save, semicolons, single quotes, and print width (80, 100, or 120). Tab size comes from the editor setting.</p>
+            <p>In <em>Settings → Formatting</em> choose Format On Save (on by default: <Kbd>Ctrl</Kbd> <Kbd>S</Kbd> formats first), Format After Delay (on by default: formats the open file automatically about a second after you stop typing, exactly like VS Code's format-on-pause extensions), semicolons, single quotes, and print width (80, 100, or 120). Tab size comes from the editor setting.</p>
           </Section>
 
           <Section id="files" title="Upload, save, download">
             <ul className="list-disc space-y-1 pl-5">
               <li><strong>New file / folder:</strong> click the icons at the top of the Explorer, the ones on a folder row, or press <Kbd>Alt</Kbd> <Kbd>N</Kbd> / <Kbd>Alt</Kbd> <Kbd>Shift</Kbd> <Kbd>N</Kbd>. A name box opens in the tree, like VS Code, inside the folder you picked (or the current file's folder). Type a name such as <code>about.html</code> or <code>Card.tsx</code>, press <Kbd>Enter</Kbd> to create it, or <Kbd>Esc</Kbd> to cancel. Clicking away with a valid name creates it too; <code>a/b.js</code> creates folders along the way. New files start empty; type a snippet like <code>rfc</code> or <code>!</code> to scaffold one.</li>
-              <li><strong>Upload:</strong> the Explorer upload buttons, <Kbd>Ctrl</Kbd> <Kbd>O</Kbd>, or drag files and folders anywhere onto the window. Folder structure is kept. <code>node_modules</code>, <code>.git</code>, <code>dist</code>, and <code>build</code> are skipped; files over 250 KB and binary files such as images are skipped too.</li>
+              <li><strong>Upload a folder:</strong> pick one with the Explorer button or drop it on the window and it opens like <em>Open Folder</em> in VS Code — the folder's structure becomes the project, its name replaces <code>react-app</code>/<code>web-project</code> as the Explorer root, and the preview runs it right away (a <code>src/</code> layout such as <code>src/main.jsx</code> or <code>src/App.tsx</code> works too). Missing <code>index.html</code>/<code>styles.css</code> stubs are added so the preview can render.</li>
+              <li><strong>Upload files:</strong> the Explorer upload buttons, <Kbd>Ctrl</Kbd> <Kbd>O</Kbd>, or drag files anywhere onto the window. Loose files merge into the current project. <code>node_modules</code>, <code>.git</code>, <code>dist</code>, and <code>build</code> are skipped. Images (PNG, JPG, GIF, WebP, AVIF, ICO, BMP) up to 1.5 MB are imported too; other binary files are skipped.</li>
+              <li><strong>Images:</strong> click an image file in the Explorer and it opens in a viewer like VS Code's — centered on a checkerboard with zoom controls (Fit, 100%, ±, Ctrl+wheel). Referenced images also render in the preview: <code>&lt;img src="logo.png"&gt;</code>, <code>srcset</code>, <code>poster</code>, and CSS <code>url()</code> resolve to project files, and <code>import logo from './logo.png'</code> gives you its URL.</li>
+              <li><strong>Drag and drop:</strong> drag files and folders inside the Explorer to move them — onto a folder, onto a file (it lands in that file's folder), or onto the root name/empty area to move it to the top level. <code>import</code> paths that point at a moved file are rewritten automatically, like a rename.</li>
+              <li><strong>Right-click:</strong> every file, folder, and the empty Explorer area has a context menu — new file/folder, rename, delete, copy path, download, upload, and collapse all.</li>
               <li><strong>Auto Save</strong> is on by default and stores every change in this browser. Turn it off in Settings or the status bar; tabs then show a dot until you press <Kbd>Ctrl</Kbd> <Kbd>S</Kbd>, and the browser warns before closing with unsaved work.</li>
               <li><strong>Download:</strong> hover a file or folder in the Explorer and click the download icon. The header download button (<Kbd>Ctrl</Kbd> <Kbd>Alt</Kbd> <Kbd>S</Kbd>) exports the current workspace: a ready-to-open web folder for HTML/CSS/JS, or a runnable Vite app for React; the command palette also has <em>Download Current File</em> and <em>Download Source Files</em>.</li>
             </ul>
@@ -136,6 +142,7 @@ npm run dev`}</Code>
               <li><strong>Output</strong>: what your page prints with <code>console.log</code>, <code>console.warn</code>, and <code>console.error</code>, plus uncaught errors. It is read-only and clears on each reload unless <em>Preserve log</em> is on.</li>
               <li><strong>Debug Console</strong>: type an expression such as <code>document.title</code> and it runs inside the live page. <Kbd>Shift</Kbd> <Kbd>Enter</Kbd> adds a line; <Kbd>↑</Kbd> recalls earlier input.</li>
               <li><strong>Terminal</strong> (<Kbd>Ctrl</Kbd> <Kbd>`</Kbd>): a shell for your project files. <code>ls</code>, <code>cd</code>, <code>tree</code>, <code>cat</code>, <code>touch</code>, <code>mkdir</code>, <code>rm</code>, <code>mv</code>, <code>cp</code>, <code>echo text &gt; file</code>, and <code>code file</code> work on the Explorer files. <code>node script.js</code> runs a JS or TS file by itself (outside the page, so there is no <code>document</code>) and prints its output; <kbd>Ctrl</kbd>+<kbd>C</kbd> stops it. <code>npm run dev</code> reloads the preview and <code>npm run build</code> lists problems. Type <code>help</code> for the full list.</li>
+              <li><strong>Panel layouts:</strong> the panel can sit at the <em>bottom</em>, dock to the <em>right</em> side, or go <em>full screen</em>, covering the editor and preview. Use the three layout buttons in the panel header, or <em>View: Move Panel to Bottom</em>, <em>View: Move Panel Right</em>, and <em>View: Toggle Maximized Panel</em> in the command palette. Drag the separator to resize the panel in either docked position.</li>
               <li>The − / + buttons in the panel header change the font size of Output, Debug Console, and Terminal. <Kbd>Ctrl</Kbd> <Kbd>=</Kbd> / <Kbd>Ctrl</Kbd> <Kbd>-</Kbd> / <Kbd>Ctrl</Kbd> <Kbd>0</Kbd> do the same while the panel has focus, and zoom the editor otherwise.</li>
             </ul>
           </Section>
@@ -149,6 +156,7 @@ document.querySelector('button')?.addEventListener('click', () => confetti())`}<
 
           <Section id="themes" title="Themes and settings">
             <p>Fifteen themes recolor the whole workbench, including JSX tags, attributes, and bracket pairs. Open the picker with <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> <Kbd>Ctrl</Kbd> <Kbd>T</Kbd>. Settings (<Kbd>Ctrl</Kbd> <Kbd>,</Kbd>) cover fonts and ligatures, minimap, word wrap, tags, Emmet, snippets, formatting, Auto Save, and showing or hiding the top header (<Kbd>Ctrl</Kbd> <Kbd>K</Kbd> <Kbd>H</Kbd>).</p>
+            <p>The <em>Updates</em> section of Settings checks whether a newer version of the app is available and applies it with <em>Update now</em> (checks need the installed app or a production build — the development server has no service worker). The <em>What's New</em> button in the header (the sparkles icon) opens a timeline of releases, newest first, so you can always see what changed.</p>
           </Section>
 
           <Section id="shortcuts" title="Keyboard shortcuts">
@@ -178,7 +186,7 @@ document.querySelector('button')?.addEventListener('click', () => confetti())`}<
           <Section id="limits" title="Limits and FAQ">
             <ul className="list-disc space-y-1 pl-5">
               <li>Projects are stored per browser. Clearing site data removes them, so download anything important.</li>
-              <li>Files must be text and under 250 KB each; uploads stop at 400 files.</li>
+              <li>Text files must be under 250 KB each and uploads stop at 400 files. Images (PNG, JPG, GIF, WebP, AVIF, ICO, BMP) are allowed up to 1.5 MB each; other binary formats are skipped.</li>
               <li>SCSS, Vue, Svelte, and non-web languages are highlighted but not compiled in the preview.</li>
               <li>Very large share links may be truncated by some chat apps.</li>
             </ul>

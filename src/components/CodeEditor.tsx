@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { editor as EditorApi } from 'monaco-editor'
-import { fileMeta } from '../lib/files'
+import { fileMeta, isImageFile } from '../lib/files'
 import { canFormat, formatSource } from '../lib/format'
 import { isJsxTagStart, openTagBefore, scanSyntax, VOID_ELEMENTS, type SyntaxSpan } from '../lib/jsxSyntax'
 import { setIntellisenseFiles } from '../lib/intellisense'
@@ -52,6 +52,7 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
     let suppress = false
     let markerTimer = 0
     let syntaxTimer = 0
+    let pauseTimer = 0
     let release = () => {}
 
     const bootEditor = async () => {
@@ -70,7 +71,10 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         return monaco.editor.createModel(content, fileMeta(path).monaco, uri)
       }
 
-      for (const [path, content] of Object.entries(getFilesRef.current())) ensure(path, content)
+      for (const [path, content] of Object.entries(getFilesRef.current())) {
+        if (isImageFile(path)) continue
+        ensure(path, content)
+      }
       await applyWordPattern()
       setIntellisenseFiles(() => getFilesRef.current())
       syncCrossLanguageLibs(getFilesRef.current())
@@ -88,7 +92,7 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         cursorBlinking: 'smooth',
         renderLineHighlight: 'all',
         roundedSelection: true,
-        wordBasedSuggestions: 'off',
+        wordBasedSuggestions: 'matchingDocuments',
         parameterHints: { enabled: true },
         hover: { enabled: true, delay: 280 },
         folding: true,
@@ -209,7 +213,9 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
       }
 
       const chord = (second: number) => monaco.KeyMod.chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, second)
-      const command = (name: string) => () => window.dispatchEvent(new CustomEvent('pg:command', { detail: name }))
+      const command = (name: string) => () => {
+        window.dispatchEvent(new CustomEvent('pg:command', { detail: name }))
+      }
       editor.addCommand(chord(monaco.KeyCode.KeyZ), command('zen'))
       editor.addCommand(chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT), command('themes'))
       editor.addCommand(chord(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS), command('shortcuts'))
@@ -222,6 +228,41 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         contextMenuGroupId: '1_modification',
         contextMenuOrder: 1.5,
         run: () => handle.current.format(),
+      })
+      editor.addAction({
+        id: 'playground.run',
+        label: 'Run Preview',
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 0.5,
+        run: command('run'),
+      })
+      editor.addAction({
+        id: 'playground.reveal',
+        label: 'Reveal in Explorer',
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 0.6,
+        run: command('reveal-explorer'),
+      })
+      editor.addAction({
+        id: 'playground.copyPath',
+        label: 'Copy Path',
+        contextMenuGroupId: '9_cutcopypaste',
+        contextMenuOrder: 4,
+        run: command('copy-path'),
+      })
+      editor.addAction({
+        id: 'playground.downloadFile',
+        label: 'Download File',
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 0.7,
+        run: command('download-file'),
+      })
+      editor.addAction({
+        id: 'playground.wordWrap',
+        label: 'Toggle Word Wrap',
+        contextMenuGroupId: '1_modification',
+        contextMenuOrder: 1.6,
+        run: () => settingsStore.update({ wordWrap: settingsStore.get().wordWrap === 'on' ? 'off' : 'on' }),
       })
 
       let markupSpans: { key: string; spans: SyntaxSpan[] } = { key: '', spans: [] }
@@ -236,6 +277,53 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         const key = `${model.uri.toString()}@${model.getVersionId()}`
         if (markupSpans.key !== key) markupSpans = { key, spans: scanSyntax(text, true).filter((span) => span.kind === 'jsx-text') }
         return markupSpans.spans.some((span) => span.start <= offset && offset <= span.end)
+      }
+
+      const tryExpandTag = () => {
+        if (!settingsStore.get().emmet) return false
+        const model = editor.getModel()
+        const position = editor.getPosition()
+        if (!model || !position || !editor.getSelection()?.isEmpty() || (editor.getSelections()?.length ?? 0) > 1) return false
+        const path = pathFromMonaco(model.uri)
+        const html = model.getLanguageId() === 'html'
+        const script = /\.(tsx|jsx|ts|js)$/.test(path)
+        if (!html && !script) return false
+        const before = model.getLineContent(position.lineNumber).slice(0, position.column - 1)
+        const match = /(?:<)?([A-Za-z][\w$-]*)((?:[.#][\w-]+)*)$/.exec(before)
+        if (!match) return false
+        const text = model.getValue()
+        const offset = model.getOffsetAt(position)
+        const start = offset - match[0].length
+        const charBefore = start > 0 ? text[start - 1] : ''
+        if (charBefore && !/[\s>]/.test(charBefore)) return false
+        if (html ? Boolean(openTagBefore(text, start)) : !inMarkup()) return false
+        const name = match[1]
+        const lower = name.toLowerCase()
+        const known = (lower === name && HTML_TAGS.has(lower)) || SVG_TAGS.has(name)
+        const custom = /^[a-z][\w-]*-[\w-]+$/.test(name)
+        const component = script && /^[A-Z]/.test(name)
+        if (!known && !custom && !component) return false
+        const classes: string[] = []
+        let id = ''
+        for (const seg of match[2].match(/[.#][\w-]+/g) ?? []) {
+          if (seg[0] === '.') classes.push(seg.slice(1))
+          else id = seg.slice(1)
+        }
+        const attrs: string[] = []
+        if (id) attrs.push(`id="${id}"`)
+        if (classes.length) attrs.push(`${script ? 'className' : 'class'}="${classes.join(' ')}"`)
+        const attrText = attrs.length ? ` ${attrs.join(' ')}` : ''
+        const selfClose = script && VOID_ELEMENTS.has(lower) && lower === name
+        const insert = selfClose ? `<${name}${attrText} />` : `<${name}${attrText}></${name}>`
+        const caretOffset = selfClose ? insert.length : 1 + name.length + attrText.length + 1
+        const startPos = model.getPositionAt(start)
+        const endPos = model.getPositionAt(offset)
+        editor.executeEdits('expand-tag', [
+          { range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column), text: insert },
+        ])
+        const caret = model.getPositionAt(start + caretOffset)
+        editor.setPosition(caret)
+        return true
       }
 
       let suggestMode = ''
@@ -260,6 +348,11 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
           if (!model) return
           onEditRef.current(pathFromMonaco(model.uri), model.getValue())
           autoCloseTag(event)
+          window.clearTimeout(pauseTimer)
+          pauseTimer = window.setTimeout(() => {
+            if (editor.getModel() !== model) return
+            if (settingsStore.get().formatOnPause) void handle.current.format(true)
+          }, 1000)
         }),
         editor.onDidChangeModel(() => {
           refreshSyntax()
@@ -275,6 +368,10 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
             if (resource.scheme !== 'file') return false
             const path = pathFromMonaco(resource)
             if (!(path in getFilesRef.current())) return false
+            if (isImageFile(path)) {
+              onOpenRef.current(path)
+              return true
+            }
             const model = ensure(path, getFilesRef.current()[path] ?? '')
             if (editor.getModel() !== model) editor.setModel(model)
             onOpenRef.current(path)
@@ -292,7 +389,13 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         editor.onKeyDown((event) => {
           if (event.keyCode !== monaco.KeyCode.Enter || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
           const row = editor.getContainerDomNode().ownerDocument.querySelector('.suggest-widget.visible .monaco-list-row.focused')
-          if (!row) return
+          if (!row) {
+            if (tryExpandTag()) {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+            return
+          }
           const emmet = /emmet/i.test(`${row.getAttribute('aria-label') ?? ''} ${row.textContent ?? ''}`)
           if (!emmet && !inMarkup()) return
           event.preventDefault()
@@ -328,8 +431,15 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
           if (!keep.has(path)) model.dispose()
         }
         for (const [path, content] of Object.entries(files)) {
+          if (isImageFile(path)) continue
           const model = ensure(path, content)
           if (model.getValue() !== content) model.setValue(content)
+        }
+        if (isImageFile(nextActive)) {
+          suppress = false
+          syncCrossLanguageLibs(files)
+          statusStore.setLanguage(fileMeta(nextActive).language)
+          return
         }
         editor.setModel(ensure(nextActive, files[nextActive] ?? ''))
         editor.setPosition({ lineNumber: 1, column: 1 })
@@ -338,6 +448,7 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         statusStore.setLanguage(fileMeta(nextActive).language)
       }
       handle.current.reveal = (path, line, column) => {
+        if (isImageFile(path)) return
         const model = ensure(path, getFilesRef.current()[path] ?? '')
         if (editor.getModel() !== model) editor.setModel(model)
         const position = { lineNumber: Math.max(1, line), column: Math.max(1, column) }
@@ -346,16 +457,18 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
         editor.focus()
       }
       handle.current.replace = (path, value) => {
+        if (isImageFile(path)) return
         const model = ensure(path, getFilesRef.current()[path] ?? '')
         model.pushEditOperations([], [{ range: model.getFullModelRange(), text: value }], () => null)
         onEditRef.current(path, value)
       }
-      handle.current.format = async () => {
+      handle.current.format = async (quiet = false) => {
         const model = editor.getModel()
         if (!model) return
         const path = pathFromMonaco(model.uri)
+        if (isImageFile(path)) return
         if (!canFormat(path)) {
-          await editor.getAction('editor.action.formatDocument')?.run()
+          if (!quiet) await editor.getAction('editor.action.formatDocument')?.run()
           return
         }
         const source = model.getValue()
@@ -364,7 +477,7 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
           const formatted = await formatSource(path, source)
           if (model.isDisposed() || model.getVersionId() !== version) return
           if (formatted === source) {
-            statusStore.flash('Already formatted')
+            if (!quiet) statusStore.flash('Already formatted')
             return
           }
           const position = editor.getPosition()
@@ -377,8 +490,9 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
             editor.setPosition({ lineNumber, column: Math.min(position.column, model.getLineMaxColumn(lineNumber)) })
           }
           editor.setScrollTop(top)
-          statusStore.flash(`Formatted ${path.split('/').pop()} with Prettier`)
+          if (!quiet) statusStore.flash(`Formatted ${path.split('/').pop()} with Prettier`)
         } catch (error) {
+          if (quiet) return
           const message = error instanceof Error ? error.message.split('\n')[0] : 'Unknown error'
           statusStore.flash(`Format failed: ${message}`, 4000)
         }
@@ -439,6 +553,7 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
       disposed = true
       window.clearTimeout(markerTimer)
       window.clearTimeout(syntaxTimer)
+      window.clearTimeout(pauseTimer)
       release()
       editorRef.current = null
     }
@@ -452,6 +567,10 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
       if (cancelled) return
       const content = getFiles()[active]
       if (content == null) return
+      if (isImageFile(active)) {
+        statusStore.setLanguage(fileMeta(active).language)
+        return
+      }
       const uri = monacoUri(active)
       let model = monaco.editor.getModel(uri)
       if (!model || model.isDisposed()) model = monaco.editor.createModel(content, fileMeta(active).monaco, uri)
@@ -484,6 +603,16 @@ export const CodeEditor = forwardRef<EditorHandle, Props>(function CodeEditor(
     </div>
   )
 })
+
+const HTML_TAGS = new Set(
+  'a abbr address area article aside audio b base bdi bdo blockquote body br button canvas caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em embed fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 head header hgroup hr html i iframe img input ins kbd label legend li link main map mark menu meta meter nav noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp script section select slot small source span strong style sub summary sup table tbody td template textarea tfoot th thead time title tr track u ul var video wbr'.split(
+    ' ',
+  ),
+)
+
+const SVG_TAGS = new Set(
+  'svg path circle rect line ellipse polygon polyline g defs use symbol text tspan clipPath mask marker pattern linearGradient radialGradient stop image foreignObject'.split(' '),
+)
 
 function inStringOrClass(before: string) {
   let quote = ''

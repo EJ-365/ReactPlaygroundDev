@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEv
 import { ChevronsDown, Code, Eye, Minimize2, Terminal, Upload } from 'lucide-react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useProject } from '../hooks/useProject'
-import { canRename, parentFolders, uniqueFolders } from '../lib/files'
+import { canRename, isImageFile, parentFolders, uniqueFolders } from '../lib/files'
 import { downloadFile, downloadFiles, downloadProject, downloadWebProject } from '../lib/download'
 import { openExternalPreview, syncExternalPreview } from '../lib/previewWindow'
 import { installStore } from '../lib/install'
@@ -18,6 +18,7 @@ import { ActivityBar, type SideView } from './ActivityBar'
 import { Breadcrumbs } from './Breadcrumbs'
 import { CodeEditor } from './CodeEditor'
 import { ConsolePanel } from './ConsolePanel'
+import { ImageView } from './ImageView'
 import { CommandPalette, DeleteFolderDialog, RenameDialog, ResetDialog, type PaletteCommand } from './Overlays'
 import { OutlineView } from './OutlineView'
 import { PreviewPane } from './PreviewPane'
@@ -62,6 +63,7 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
   const consolePane = useRef<HTMLDivElement>(null)
   const editorWidth = useRef(0)
   const consoleHeight = useRef(240)
+  const consoleWidth = useRef(360)
   const desktopRef = useRef(desktop)
   const actions = useRef(project)
   desktopRef.current = desktop
@@ -72,12 +74,22 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
     if (!desktop) {
       editorPane.current.style.width = ''
       consolePane.current.style.height = ''
+      consolePane.current.style.width = ''
       return
     }
     if (!project.previewOpen) editorPane.current.style.width = ''
     else if (editorWidth.current) editorPane.current.style.width = `${editorWidth.current}px`
-    consolePane.current.style.height = project.consoleOpen ? `${consoleHeight.current}px` : '0px'
-  }, [desktop, project.consoleOpen, project.previewOpen])
+    if (project.panelLayout === 'right') {
+      consolePane.current.style.height = ''
+      consolePane.current.style.width = project.consoleOpen ? `${consoleWidth.current}px` : '0px'
+    } else if (project.panelLayout === 'full') {
+      consolePane.current.style.width = ''
+      consolePane.current.style.height = ''
+    } else {
+      consolePane.current.style.width = ''
+      consolePane.current.style.height = project.consoleOpen ? `${consoleHeight.current}px` : '0px'
+    }
+  }, [desktop, project.consoleOpen, project.previewOpen, project.panelLayout])
 
   useEffect(() => {
     syncExternalPreview(project.previewHtml)
@@ -247,6 +259,16 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
       else if (name === 'themes') setPanel('themes')
       else if (name === 'shortcuts') setPanel('shortcuts')
       else if (name === 'workspace') switchRef.current(workspaceStore.get() === 'web' ? 'react' : 'web')
+      else if (name === 'run') actions.current.run()
+      else if (name === 'reveal-explorer') {
+        setView('explorer')
+        actions.current.setSidebarOpen(true)
+      } else if (name === 'copy-path') {
+        void copyText(actions.current.active).then((ok) => statusStore.flash(ok ? 'Path copied' : actions.current.active))
+      } else if (name === 'download-file') {
+        const text = actions.current.getFiles()[actions.current.active]
+        if (text != null) downloadFile(actions.current.active, text)
+      }
     }
     window.addEventListener('pg:command', onCommand)
     return () => window.removeEventListener('pg:command', onCommand)
@@ -301,9 +323,12 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
     return files
   }, [project.problems])
 
+  const sidePanel = desktop && project.panelLayout === 'right'
+  const fullPanel = desktop && project.panelLayout === 'full' && !zen
+  const imageActive = isImageFile(project.active)
   const showCode = desktop || project.mobilePane === 'code'
   const showPreview = desktop ? project.previewOpen : project.mobilePane === 'preview'
-  const showConsole = desktop ? project.consoleOpen && !zen : project.mobilePane === 'console'
+  const showConsole = desktop ? (project.consoleOpen || fullPanel) && !zen : project.mobilePane === 'console'
   const sidebarOpen = project.sidebarOpen && !zen
 
   const saveNow = async () => {
@@ -315,9 +340,17 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
 
   const importUpload = async (pending: Promise<UploadResult>) => {
     try {
-      const { files, skipped } = await pending
+      const { files, skipped, root } = await pending
       if (!files.length) {
         statusStore.flash(skipped.length ? `Nothing imported: ${skipped.length} file(s) unsupported or larger than 250 KB` : 'No files found', 3500)
+        return
+      }
+      if (root) {
+        if (!window.confirm(`Open folder "${root}" as this workspace's project? It replaces the current files.`)) return
+        actions.current.loadImported(files, root)
+        setView('explorer')
+        actions.current.setSidebarOpen(true)
+        statusStore.flash(`Opened ${root} — ${files.length} file${files.length === 1 ? '' : 's'}${skipped.length ? `, skipped ${skipped.length}` : ''}`, 3500)
         return
       }
       const existing = new Set(actions.current.paths)
@@ -435,6 +468,9 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
     { id: 'terminal', label: 'View: Toggle Terminal', hint: 'Ctrl+`', run: () => { project.setConsoleTab('terminal'); project.setConsoleOpen(true); project.setMobilePane('console') } },
     { id: 'output', label: 'View: Show Output', run: () => { project.setConsoleTab('output'); project.setConsoleOpen(true); project.setMobilePane('console') } },
     { id: 'debug-console', label: 'View: Show Debug Console', run: () => { project.setConsoleTab('debug'); project.setConsoleOpen(true); project.setMobilePane('console') } },
+    { id: 'panel-bottom', label: 'View: Move Panel to Bottom', run: () => project.setPanelLayout('bottom') },
+    { id: 'panel-right', label: 'View: Move Panel Right', run: () => project.setPanelLayout('right') },
+    { id: 'panel-full', label: 'View: Toggle Maximized Panel', run: () => project.setPanelLayout(project.panelLayout === 'full' ? 'bottom' : 'full') },
     { id: 'zoom-in', label: 'View: Editor Font Zoom In', hint: 'Ctrl+=', run: () => zoomEditor(1) },
     { id: 'zoom-out', label: 'View: Editor Font Zoom Out', hint: 'Ctrl+-', run: () => zoomEditor(-1) },
     { id: 'zoom-reset', label: 'View: Editor Font Zoom Reset', hint: 'Ctrl+0', run: () => zoomEditor(0) },
@@ -514,6 +550,39 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
     handle.addEventListener('pointerup', up)
   }
 
+  const dragPanelSide = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!desktopRef.current || !consolePane.current) return
+    const handle = event.currentTarget
+    const startX = event.clientX
+    const startW = consolePane.current.getBoundingClientRect().width
+    handle.setPointerCapture(event.pointerId)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    const move = (ev: PointerEvent) => {
+      const row = consolePane.current?.parentElement
+      if (!row || !consolePane.current) return
+      const next = startW + (startX - ev.clientX)
+      if (next < 120) {
+        consolePane.current.style.width = '0px'
+        actions.current.setConsoleOpen(false)
+        return
+      }
+      const width = Math.min(row.clientWidth * 0.7, next)
+      consoleWidth.current = width
+      consolePane.current.style.width = `${width}px`
+      actions.current.setConsoleOpen(true)
+    }
+    const up = (ev: PointerEvent) => {
+      if (handle.hasPointerCapture(ev.pointerId)) handle.releasePointerCapture(ev.pointerId)
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+  }
+
   return (
     <div
       data-shell
@@ -564,7 +633,7 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
             <OutlineView active={project.active} getFiles={project.getFiles} onReveal={project.goTo} />
           ) : (
           <Sidebar
-            root={WORKSPACES[project.workspace].root}
+            root={project.name ?? WORKSPACES[project.workspace].root}
             paths={project.paths}
             folders={project.folders}
             active={project.active}
@@ -576,6 +645,7 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
             onCreateSubmit={(path) => (creating?.kind === 'folder' ? project.createFolder(path) : project.createFile(path))}
             onCreateCancel={() => project.setDialog(null)}
             onRename={(path, kind) => project.setDialog({ type: 'rename', path, kind })}
+            onMove={project.move}
             onDelete={project.deleteFile}
             onDeleteFolder={(path) => project.setDialog({ type: 'delete-folder', path })}
             onUploadFiles={() => fileInput.current?.click()}
@@ -592,8 +662,8 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
         {!desktop && sidebarOpen && (
           <button type="button" aria-label="Close files" className="absolute inset-0 z-30 bg-black/55" onClick={() => project.setSidebarOpen(false)} />
         )}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1">
+        <div className={`flex min-w-0 flex-1 ${sidePanel ? 'flex-row' : 'flex-col'}`}>
+          <div className={`${fullPanel ? 'hidden' : 'flex'} min-h-0 min-w-0 flex-1`}>
             <div ref={editorPane} data-tour="editor" className={`${showCode ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col ${desktop && project.previewOpen ? 'w-[58%]' : 'w-full flex-1'}`}>
               <TabBar
                 tabs={project.openTabs}
@@ -604,15 +674,18 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
                 onClose={project.closeTab}
               />
               <Breadcrumbs active={project.active} getFiles={project.getFiles} onReveal={project.goTo} onFolder={() => showView('explorer')} />
-              <CodeEditor
-                ref={project.editorRef}
-                active={project.active}
-                visible={showCode}
-                getFiles={project.getFiles}
-                onEdit={project.onEdit}
-                onMarkers={project.onMarkers}
-                onOpen={project.openTab}
-              />
+              <div className="relative flex min-h-0 flex-1 flex-col">
+                <CodeEditor
+                  ref={project.editorRef}
+                  active={project.active}
+                  visible={showCode && !imageActive}
+                  getFiles={project.getFiles}
+                  onEdit={project.onEdit}
+                  onMarkers={project.onMarkers}
+                  onOpen={project.openTab}
+                />
+                {imageActive && <ImageView path={project.active} content={project.getFiles()[project.active] ?? ''} />}
+              </div>
             </div>
             {desktop && (
               <div
@@ -640,36 +713,39 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
               />
             </div>
           </div>
-          {desktop && (
+          {desktop && !fullPanel && (
             <div
               role="separator"
-              aria-orientation="horizontal"
-              aria-label="Resize console. Drag closed to hide it."
-              className="group relative z-20 h-2 shrink-0 cursor-row-resize touch-none"
-              onPointerDown={dragConsole}
+              aria-orientation={sidePanel ? 'vertical' : 'horizontal'}
+              aria-label="Resize panel. Drag closed to hide it."
+              className={`group relative z-20 shrink-0 touch-none ${sidePanel ? 'w-2 cursor-col-resize' : 'h-2 cursor-row-resize'}`}
+              onPointerDown={sidePanel ? dragPanelSide : dragConsole}
               onDoubleClick={() => {
-                consoleHeight.current = 240
+                if (sidePanel) consoleWidth.current = 360
+                else consoleHeight.current = 240
                 actions.current.setConsoleOpen((open) => !open)
               }}
             >
-              <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-fg/10 group-hover:bg-accent" />
+              <span className={`absolute bg-fg/10 group-hover:bg-accent ${sidePanel ? 'inset-y-0 left-1/2 w-px -translate-x-1/2' : 'inset-x-0 top-1/2 h-px -translate-y-1/2'}`} />
             </div>
           )}
           <div
             ref={consolePane}
-            className={`${showConsole ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col overflow-hidden ${desktop ? '' : 'flex-1'}`}
+            className={`${showConsole ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-col overflow-hidden ${desktop ? (sidePanel ? 'h-full shrink-0' : fullPanel ? 'flex-1' : '') : 'flex-1'}`}
           >
             <ConsolePanel
               entries={project.entries}
               problems={project.problems}
               tab={project.consoleTab}
               preserve={project.preserveLog}
+              layout={project.panelLayout}
+              onLayout={project.setPanelLayout}
               onTab={project.setConsoleTab}
               onPreserve={project.setPreserveLog}
               onClear={project.clearConsole}
               onEval={project.evalInPreview}
               shell={{
-                root: WORKSPACES[project.workspace].root,
+                root: project.name ?? WORKSPACES[project.workspace].root,
                 workspace: project.workspace,
                 files: project.getFiles,
                 folders: () => actions.current.folders,
@@ -692,7 +768,14 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
                 project.revealProblem(problem)
                 project.setConsoleTab('problems')
               }}
-              onClose={desktop ? () => project.setConsoleOpen(false) : undefined}
+              onClose={
+                desktop
+                  ? () => {
+                      if (project.panelLayout === 'full') project.setPanelLayout('bottom')
+                      project.setConsoleOpen(false)
+                    }
+                  : undefined
+              }
             />
           </div>
         </div>

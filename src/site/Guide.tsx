@@ -72,9 +72,10 @@ export function Counter({ start = 0 }: { start?: number }) {
     summary: 'Upload files or a whole folder.',
     steps: [
       <>Drag a folder from your file manager onto the editor window, or click <em>Upload folder</em> in the Explorer.</>,
-      <><code>node_modules</code>, <code>.git</code>, and build folders are skipped; images and files over 250 KB are skipped too.</>,
-      <>If a file already exists you are asked before it is replaced. Imported folders appear in the Explorer with their structure intact.</>,
-      <>Upload into the matching workspace: React projects need <code>main.tsx</code>/<code>main.jsx</code> or <code>App.tsx</code>; plain pages use <code>index.html</code>, <code>styles.css</code>, and <code>script.js</code> in HTML · CSS · JS.</>,
+      <>A single folder opens like <em>Open Folder</em> in VS Code: its structure becomes the project, its name becomes the Explorer root, and the preview runs it right away.</>,
+      <><code>node_modules</code>, <code>.git</code>, and build folders are skipped, along with text files over 250 KB. Images (PNG, JPG, GIF, WebP…) up to 1.5 MB are imported and open in the image viewer; other binary files are skipped.</>,
+      <>If a file already exists you are asked before it is replaced. Uploaded loose files merge into the current project.</>,
+      <>Upload into the matching workspace: React projects need <code>main.tsx</code>/<code>main.jsx</code> or <code>App.tsx</code> (a <code>src/</code> layout works too); plain pages use <code>index.html</code>, <code>styles.css</code>, and <code>script.js</code> in HTML · CSS · JS.</>,
     ],
   },
   {

@@ -30,6 +30,7 @@ export type Settings = {
   reactSnippets: boolean
   inlayHints: boolean
   formatOnSave: boolean
+  formatOnPause: boolean
   formatSemicolons: boolean
   formatSingleQuote: boolean
   formatPrintWidth: 80 | 100 | 120
@@ -64,7 +65,8 @@ export const DEFAULT_SETTINGS: Settings = {
   emmet: true,
   reactSnippets: true,
   inlayHints: true,
-  formatOnSave: false,
+  formatOnSave: true,
+  formatOnPause: true,
   formatSemicolons: false,
   formatSingleQuote: true,
   formatPrintWidth: 100,
@@ -91,7 +93,8 @@ function clamp(settings: Partial<Settings> | null | undefined): Settings {
   next.emmet = next.emmet !== false
   next.reactSnippets = next.reactSnippets !== false
   next.inlayHints = next.inlayHints !== false
-  next.formatOnSave = next.formatOnSave === true
+  next.formatOnSave = next.formatOnSave !== false
+  next.formatOnPause = next.formatOnPause !== false
   next.formatSemicolons = next.formatSemicolons === true
   next.formatSingleQuote = next.formatSingleQuote !== false
   if (next.formatPrintWidth !== 80 && next.formatPrintWidth !== 120) next.formatPrintWidth = 100

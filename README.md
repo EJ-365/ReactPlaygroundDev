@@ -60,6 +60,10 @@ Each workspace keeps its own files, open tabs, preview and console.
   and the import is added or merged at the top.
 - **Tailwind CSS IntelliSense:** class-name completions and color swatches inside `className="..."`.
 - **Emmet** in HTML, JSX, TSX and CSS: type `ul>li*3` or `div.card>h2+p` and press Enter or Tab.
+  A real tag name expands on Enter too — type `p` in markup to get `<p></p>`; `p.note` and
+  `main#app` add class/id attributes (`className` in JSX/TSX). Ordinary words are left alone;
+  custom elements (`my-card`) and capitalized JSX components work too.
+- **Word-based suggestions** on top of the TypeScript, auto-import and Tailwind completions.
 - **React snippets:** `rfc`, `rfce`, `rafce`, `rfcp`, `us` (useState), `ue`, `uec`, `ur`, `um`,
   `ucb`, `imr`, `imc`, `clg`, `jmap`, `jcond`, `jtern`, `hclick`.
 - **Tags:** auto-close, self-closing tags and auto-rename of the matching tag (each can be turned
@@ -68,8 +72,9 @@ Each workspace keeps its own files, open tabs, preview and console.
   `onClick={}`, with the cursor in the right place.
 - **Unused code is dimmed**, like in VS Code (unused imports and variables).
 - **Inlay type hints** in `.ts`/`.tsx` files (hidden in `.js`/`.jsx`, where they don't belong).
-- **Formatting with Prettier** (`Shift+Alt+F`) for HTML, CSS, JS, TS, JSX and TSX, with optional
-  Format On Save and settings for semicolons, quotes and line width.
+- **Formatting with Prettier** (`Shift+Alt+F`) for HTML, CSS, JS, TS, JSX and TSX, with Format On
+  Save and **Format After Delay** (auto-formats when you stop typing) both on by default, plus
+  settings for semicolons, quotes and line width.
 - Multi-cursor, move/copy line, sticky scroll, bracket-pair colors, minimap, find and replace,
   go to line, go to symbol, and the error markers on the scrollbar.
 
@@ -79,11 +84,15 @@ Each workspace keeps its own files, open tabs, preview and console.
 - **Explorer:** a single VS Code-style file tree. Folders open and close, new files and folders are
   named inline (Enter creates, Esc cancels, `a/b.js` creates the folders on the way), files can be
   renamed, deleted and downloaded, and files with errors turn red with an error count.
+  **Drag and drop** moves files and folders (imports are rewritten), and a **right-click menu**
+  offers new file/folder, rename, delete, copy path, download and upload.
 - **Search across files** (`Ctrl+Shift+F`) with match case, whole word, regex and replace-all with a preview.
 - **Outline** (`Ctrl+Shift+U`) of components, hooks, functions, types or CSS selectors.
 - **Breadcrumbs**, **tabs** with file-type icons and a highlighted active tab, and **Zen mode** (`Ctrl+K` then `Z`).
 - **Command palette** (`Ctrl+Shift+P`) and **Quick Open** (`Ctrl+P`).
-- **Bottom panel** with four tabs:
+- **What's New:** the sparkles button in the header opens a release timeline, newest first.
+- **Bottom panel** with four tabs, docked at the bottom, on the right, or maximized full-screen
+  (layout buttons in the panel header, or the `View: Move Panel…` commands):
   - **Problems:** errors and warnings; click one to jump to it.
   - **Output:** what your page's JavaScript logs (`console.log`, warnings, errors).
   - **Debug Console:** evaluate expressions against the running preview.
@@ -106,17 +115,23 @@ Shades of Purple, Solarized Light and High Contrast.
 Settings (`Ctrl+,`) include font family and ligatures, font size, tab size, word wrap, minimap,
 line numbers, cursor style, whitespace rendering, bracket pairs, sticky scroll, auto-closing tags,
 self-closing tags, rename tags, Emmet, React snippets, inlay hints, JavaScript suggestion behavior,
-formatting options, Format On Save and Auto Save.
+formatting options, Format On Save, Format After Delay and Auto Save. The **Updates** section
+checks for a newer version of the app and applies it with *Update now* (installed app or
+production build).
 
 ### Files, saving and sharing
 
 - **Auto Save** to your browser (on by default). With it off, `Ctrl+S` saves and unsaved tabs show a dot.
 - **Upload** files or whole folders with the Explorer buttons, `Ctrl+O`, or drag and drop.
-  Folder structure is kept, and `node_modules`, `.git` and `dist` are skipped.
+  A single folder opens like VS Code's *Open Folder*: its structure becomes the project, its name
+  becomes the Explorer root, and the preview runs it (a `src/` layout works too). Loose files merge
+  into the current project. `node_modules`, `.git` and `dist` are skipped.
 - **Download** a single file, a folder, or the whole project (`Ctrl+Alt+S`) as a `.zip`.
 - **Share links:** the share button copies a link with your whole project inside it, so there is
   no server and no account. Whoever opens it gets a copy of your project.
 - **Templates:** React + TypeScript, React Todo App, HTML/CSS/JavaScript, and a Tailwind landing page.
+- **Images:** PNG, JPG, GIF, WebP, AVIF, ICO and BMP files (up to 1.5 MB) open in a VS Code-style
+  image viewer with zoom controls, and render in the preview when referenced from HTML or CSS.
 - Many other file types (Markdown, JSON, SCSS, Vue, Svelte, Python, C/C++, C#, Java, Go, Rust, PHP
   and more) can be created and edited with highlighting. Only HTML, CSS, JS, TS, JSX and TSX run in the preview.
 
