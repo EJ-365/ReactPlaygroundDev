@@ -36,7 +36,7 @@ and you get an editor that behaves like VS Code, with a live preview next to it.
 
 ## Live demo
 
-> https://YOUR-DEPLOYMENT-URL (replace this with your Vercel or Cloudflare Pages address)
+> [https://reactplagrounddev.ej-365.workers.dev/](https://reactplagrounddev.ej-365.workers.dev/)
 
 ## Features
 
