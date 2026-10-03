@@ -1,0 +1,39 @@
+{
+  "name": "react-playground",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A free, open-source, VS Code-style frontend playground that runs in the browser.",
+  "author": "Ejay Gabriel <eebudonihian@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EJ-365/ReactPlagroundDev.git"
+  },
+  "homepage": "https://github.com/EJ-365/ReactPlagroundDev#readme",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "emmet-monaco-es": "^5.7.0",
+    "esbuild-wasm": "^0.25.8",
+    "lucide-react": "^0.544.0",
+    "monaco-editor": "^0.53.0",
+    "monaco-tailwindcss": "^0.6.1",
+    "prettier": "3.9.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7"
+  }
+}
