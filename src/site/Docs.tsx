@@ -83,8 +83,9 @@ createRoot(document.getElementById('root')!).render(<App />)`}</Code>
                 ['types.ts', 'TypeScript: runs, type-checked in the editor'],
                 ['App.tsx', 'TSX: runs, React 19'],
                 ['data.json', 'JSON: importable as a module'],
-                ['README.md', 'Markdown, SVG, YAML, text: editable'],
+                ['README.md', 'Markdown, YAML, text: editable'],
                 ['logo.png', 'Images (PNG, JPG, GIF…): open in the viewer'],
+                ['icon.svg', 'SVG: rendered preview with source toggle'],
                 ['main.cpp', 'C/C++, Python, Java, Go, Rust, PHP…: highlighted only'],
                 ['theme.scss', 'SCSS, Less, Vue, Svelte: highlighted only'],
               ].map(([path, label]) => (

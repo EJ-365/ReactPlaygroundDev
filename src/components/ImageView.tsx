@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ImageOff, Maximize, Minus, Plus } from 'lucide-react'
-import { isDataUrl } from '../lib/media'
+import { dataUrlBytes, isDataUrl, textToSvgDataUrl } from '../lib/media'
 
 const CHECKER = {
   backgroundColor: '#202329',
@@ -16,15 +16,22 @@ function formatBytes(bytes: number) {
 }
 
 export function ImageView({ path, content }: { path: string; content: string }) {
-  const ok = isDataUrl(content)
+  const svg = /\.svg$/i.test(path)
+  const src = isDataUrl(content) ? content : svg && content.trim() ? textToSvgDataUrl(content) : ''
+  const ok = Boolean(src)
   const [zoom, setZoom] = useState<'fit' | number>('fit')
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
+  const [broken, setBroken] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setZoom('fit')
     setNatural(null)
   }, [path])
+
+  useEffect(() => {
+    setBroken(false)
+  }, [src])
 
   const step = (dir: 1 | -1) => {
     setZoom((current) => {
@@ -34,7 +41,11 @@ export function ImageView({ path, content }: { path: string; content: string }) 
     })
   }
 
-  const bytes = ok ? Math.round((content.length - content.indexOf(',') - 1) * 0.75) : 0
+  const bytes = useMemo(() => {
+    if (!ok) return 0
+    if (isDataUrl(content)) return dataUrlBytes(content)?.length ?? 0
+    return new TextEncoder().encode(content).length
+  }, [content, ok])
   const width = zoom === 'fit' ? undefined : natural ? natural.w * zoom : undefined
 
   return (
@@ -73,20 +84,21 @@ export function ImageView({ path, content }: { path: string; content: string }) 
         }}
       >
         <div className="grid min-h-full place-items-center p-6" style={CHECKER}>
-          {ok ? (
+          {ok && !broken ? (
             <img
-              src={content}
+              src={src}
               alt={path}
               draggable={false}
               onLoad={(event) => setNatural({ w: event.currentTarget.naturalWidth, h: event.currentTarget.naturalHeight })}
+              onError={() => setBroken(true)}
               className="select-none rounded-sm shadow-2xl"
               style={width ? { width, maxWidth: 'none' } : { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
             />
           ) : (
             <div className="flex flex-col items-center gap-2 text-center text-muted">
               <ImageOff size={28} />
-              <p className="text-sm">No image data in this file.</p>
-              <p className="text-xs text-muted/70">Upload an image to replace it.</p>
+              <p className="text-sm">{svg ? 'Nothing to render yet.' : 'No image data in this file.'}</p>
+              <p className="text-xs text-muted/70">{svg ? 'Edit the markup in source view to see it here.' : 'Upload an image to replace it.'}</p>
             </div>
           )}
         </div>

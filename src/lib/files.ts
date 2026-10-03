@@ -51,6 +51,10 @@ export function isImageFile(path: string) {
   return (IMAGE_EXTENSIONS as readonly string[]).includes(ext)
 }
 
+export function isSvgFile(path: string) {
+  return path.slice(path.lastIndexOf('.') + 1).toLowerCase() === 'svg'
+}
+
 export function fileMeta(name: string) {
   if (name.endsWith('.tsx')) return { language: 'TypeScript React', monaco: 'typescript', label: 'TSX', color: '#2dd4bf' }
   if (name.endsWith('.ts')) return { language: 'TypeScript', monaco: 'typescript', label: 'TS', color: '#60a5fa' }

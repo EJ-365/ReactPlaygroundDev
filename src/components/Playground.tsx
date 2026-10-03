@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEv
 import { ChevronsDown, Code, Eye, Minimize2, Terminal, Upload } from 'lucide-react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useProject } from '../hooks/useProject'
-import { canRename, isImageFile, parentFolders, uniqueFolders } from '../lib/files'
+import { canRename, isImageFile, isSvgFile, parentFolders, uniqueFolders } from '../lib/files'
 import { downloadFile, downloadFiles, downloadProject, downloadWebProject } from '../lib/download'
 import { openExternalPreview, syncExternalPreview } from '../lib/previewWindow'
 import { installStore } from '../lib/install'
@@ -50,6 +50,7 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
   const [view, setView] = useState<SideView>('explorer')
   const [searchFocus, setSearchFocus] = useState(0)
   const [zen, setZen] = useState(false)
+  const [svgPreview, setSvgPreview] = useState(true)
   const [paletteQuery, setPaletteQuery] = useState('')
   const lastEscape = useRef(0)
   const viewRef = useRef(view)
@@ -94,6 +95,10 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
   useEffect(() => {
     syncExternalPreview(project.previewHtml)
   }, [project.previewHtml])
+
+  useEffect(() => {
+    setSvgPreview(true)
+  }, [project.active])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -326,6 +331,8 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
   const sidePanel = desktop && project.panelLayout === 'right'
   const fullPanel = desktop && project.panelLayout === 'full' && !zen
   const imageActive = isImageFile(project.active)
+  const svgActive = isSvgFile(project.active)
+  const mediaActive = imageActive || (svgActive && svgPreview)
   const showCode = desktop || project.mobilePane === 'code'
   const showPreview = desktop ? project.previewOpen : project.mobilePane === 'preview'
   const showConsole = desktop ? (project.consoleOpen || fullPanel) && !zen : project.mobilePane === 'console'
@@ -670,6 +677,21 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
                 active={project.active}
                 problems={problemFiles}
                 unsaved={project.unsaved}
+                extra={
+                  svgActive ? (
+                    <button
+                      type="button"
+                      data-testid="svg-preview-toggle"
+                      title={svgPreview ? 'Show SVG source' : 'Show SVG preview'}
+                      aria-label={svgPreview ? 'Show SVG source' : 'Show SVG preview'}
+                      aria-pressed={svgPreview}
+                      onClick={() => setSvgPreview((on) => !on)}
+                      className={`rounded-md p-1.5 ${svgPreview ? 'bg-fg/10 text-fg' : 'text-muted hover:bg-fg/5 hover:text-fg'}`}
+                    >
+                      {svgPreview ? <Code size={14} /> : <Eye size={14} />}
+                    </button>
+                  ) : undefined
+                }
                 onSelect={project.setActive}
                 onClose={project.closeTab}
               />
@@ -678,13 +700,13 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
                 <CodeEditor
                   ref={project.editorRef}
                   active={project.active}
-                  visible={showCode && !imageActive}
+                  visible={showCode && !mediaActive}
                   getFiles={project.getFiles}
                   onEdit={project.onEdit}
                   onMarkers={project.onMarkers}
                   onOpen={project.openTab}
                 />
-                {imageActive && <ImageView path={project.active} content={project.getFiles()[project.active] ?? ''} />}
+                {mediaActive && <ImageView path={project.active} content={project.getFiles()[project.active] ?? ''} />}
               </div>
             </div>
             {desktop && (
