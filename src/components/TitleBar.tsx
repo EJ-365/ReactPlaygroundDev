@@ -3,7 +3,7 @@ import { BookOpen, Braces, ChevronsUp, Download, Eye, Keyboard, MonitorDown, Pal
 import { Logo } from './Logo'
 import { installStore } from '../lib/install'
 import { statusStore } from '../lib/statusStore'
-import { WORKSPACES, type WorkspaceId } from '../lib/workspace'
+import { WORKSPACE_IDS, WORKSPACES, type WorkspaceId } from '../lib/workspace'
 import { WhatsNew } from './WhatsNew'
 
 type Props = {
@@ -41,8 +41,8 @@ export function TitleBar({ onRun, onFormat, onReset, onToggleSidebar, onTogglePr
         <Logo size={28} />
         <span className="hidden text-sm font-semibold leading-none text-fg sm:block">Playground</span>
       </a>
-      <div role="tablist" aria-label="Workspace" title="Switch workspace (Ctrl+K W)" className="ml-2 flex shrink-0 items-center rounded-lg border border-fg/10 bg-fg/[0.03] p-0.5" data-testid="workspace-switch">
-        {(['web', 'react'] as const).map((id) => (
+      <div role="tablist" aria-label="Workspace" title="Switch workspace (Ctrl+K W)" className="ml-2 flex shrink items-center gap-0 overflow-x-auto whitespace-nowrap rounded-lg border border-fg/10 bg-fg/[0.03] p-0.5" data-testid="workspace-switch">
+        {WORKSPACE_IDS.map((id) => (
           <button
             key={id}
             type="button"

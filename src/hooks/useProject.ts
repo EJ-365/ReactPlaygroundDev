@@ -7,6 +7,7 @@ import type { Incoming } from '../lib/upload'
 import { externalPreviewWindow } from '../lib/previewWindow'
 import { statusStore } from '../lib/statusStore'
 import { WORKSPACES, workspaceStore } from '../lib/workspace'
+import { formatSer } from '../components/ConsolePanel'
 import { subscribeTailwind, tailwindReady } from '../lib/tailwindService'
 import type { ConsoleEntry, ConsoleLevel, ConsoleTab, Device, EditorHandle, MobilePane, PanelLayout, Problem, Ser } from '../types'
 
@@ -48,6 +49,7 @@ export function useProject() {
   const saveTimer = useRef(0)
   const runLock = useRef(false)
   const rerun = useRef(false)
+  const runRequested = useRef(false)
   const usedCdn = useRef(false)
   const lastError = useRef('')
   const previewRef = useRef('')
@@ -171,6 +173,67 @@ export function useProject() {
     [flushEntries],
   )
 
+  const terminalTargets = useCallback(() => [iframeRef.current?.contentWindow, externalPreviewWindow()].filter(Boolean) as Window[], [])
+
+  const postToTerminal = useCallback(
+    (message: { channel: string; type: string; level?: ConsoleLevel; text?: string }) => {
+      for (const target of terminalTargets()) target.postMessage(message, '*')
+    },
+    [terminalTargets],
+  )
+
+  const frameReady = useCallback(() => {
+    const frame = iframeRef.current
+    if (!frame || frame.contentDocument?.readyState === 'complete') return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      frame.addEventListener('load', () => resolve(), { once: true })
+      setTimeout(resolve, 3000)
+    })
+  }, [])
+
+  const runProgram = useCallback(
+    async (files: Record<string, string>) => {
+      const info = WORKSPACES[workspace]
+      const kind = info.kind
+      if (kind !== 'python' && kind !== 'lang') return
+      await frameReady()
+      const line = (level: ConsoleLevel, text: string) => {
+        pushEntry(level, [{ t: 'string', v: text }])
+        postToTerminal({ channel: 'rp', type: 'pg:line', level, text })
+      }
+      postToTerminal({ channel: 'rp', type: 'pg:clear' })
+      if (kind === 'python') {
+        line('system', `Running ${info.entry}…`)
+        void import('../lib/runner')
+          .then(({ runPython }) => runPython(files, info.entry))
+          .then(({ lines, version }) => {
+            for (const item of lines) line(item.level, item.text)
+            if (!lines.length) line('info', '(no output)')
+            line('system', `Done — Python ${version}`)
+          })
+          .catch((error: unknown) => {
+            line('error', `Runner: ${error instanceof Error ? error.message : String(error)}`)
+          })
+        return
+      }
+      if (!info.runner) return
+      line('system', `Running ${info.entry} via the Wandbox runner…`)
+      void import('../lib/runner')
+        .then(({ executeRemote }) => executeRemote(files, info))
+        .then((result) => {
+          if (result.compileError.trim()) line('error', result.compileError.trim())
+          for (const text of result.stdout.trimEnd().split('\n')) if (text.trim()) line('log', text)
+          for (const text of result.stderr.trimEnd().split('\n')) if (text.trim()) line('error', text)
+          if (!result.stdout.trim() && !result.stderr.trim() && !result.compileError.trim()) line('info', '(no output)')
+          line('system', `Exited with code ${result.code ?? 0} — ${result.compiler}`)
+        })
+        .catch((error: unknown) => {
+          line('error', `Runner: ${error instanceof Error ? error.message : String(error)}. Check your connection — the runner is a remote service.`)
+        })
+    },
+    [frameReady, postToTerminal, pushEntry, workspace],
+  )
+
   const publish = useCallback(async () => {
     if (runLock.current) {
       rerun.current = true
@@ -185,6 +248,15 @@ export function useProject() {
         const { compileProject } = await import('../lib/compile')
         const result = await compileProject(snapshot, workspace)
         if (rerun.current) continue
+        const kind = WORKSPACES[workspace].kind
+        const shouldRun = runRequested.current
+        runRequested.current = false
+        if (kind === 'python') runProgram(snapshot)
+        else if (kind === 'lang' && shouldRun) runProgram(snapshot)
+        else if (kind === 'script' && shouldRun && previewRef.current === result.html) {
+          pushEntry('system', [{ t: 'string', v: `Running ${WORKSPACES[workspace].entry}` }])
+          iframeRef.current?.contentWindow?.location.reload()
+        }
         usedCdn.current = result.useCdn
         setBuildProblems(result.problems)
         const signature = result.problems
@@ -201,7 +273,7 @@ export function useProject() {
             queue.current = queue.current.filter((entry) => entry.source === 'repl')
             setEntries((prev) => prev.filter((entry) => entry.source === 'repl'))
           }
-          pushEntry('system', [{ t: 'string', v: `Running ${workspace === 'web' ? 'index.html' : 'main.tsx'}` }])
+          pushEntry('system', [{ t: 'string', v: `Running ${WORKSPACES[workspace].entry}` }])
           setPreviewHtml(result.html)
         } else if (result.ok) {
           statusStore.setPhase('ready')
@@ -220,10 +292,11 @@ export function useProject() {
       runLock.current = false
       if (rerun.current) void publish()
     }
-  }, [pushEntry, workspace])
+  }, [pushEntry, runProgram, workspace])
 
   const schedule = useCallback(
     (immediate = false) => {
+      if (immediate) runRequested.current = true
       window.clearTimeout(saveTimer.current)
       const wait = immediate ? 0 : 200
       saveTimer.current = window.setTimeout(() => void publish(), wait)
@@ -256,12 +329,18 @@ export function useProject() {
       if (!target || event.source !== target) return
       const data = event.data as { channel?: string; type?: string; level?: ConsoleLevel; args?: Ser[]; id?: number; ok?: boolean; value?: Ser }
       if (!data || data.channel !== 'rp') return
-      if (data.type === 'console' && data.level && data.args) pushEntry(data.level, data.args)
+      if (data.type === 'console' && data.level && data.args) {
+        pushEntry(data.level, data.args)
+        if (WORKSPACES[workspace].kind === 'script') {
+          const text = data.args.map((arg) => formatSer(arg, true)).join(' ')
+          target.postMessage({ channel: 'rp', type: 'pg:line', level: data.level, text }, '*')
+        }
+      }
       if (data.type === 'eval-result' && data.value) pushEntry(data.ok ? 'result' : 'error', [data.value], 'repl')
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pushEntry])
+  }, [pushEntry, workspace])
 
   const getFiles = useCallback(() => filesRef.current, [])
 
@@ -333,10 +412,10 @@ export function useProject() {
           tabs.filter((tab) => tab !== name),
           nextPaths,
         )
-        setActive((current) => (current === name ? next[0] ?? 'index.html' : current))
+        setActive((current) => (current === name ? next[0] ?? WORKSPACES[workspace].entry : current))
         return next
       })
-      editorRef.current?.setAll(filesRef.current, name === active ? 'index.html' : active)
+      editorRef.current?.setAll(filesRef.current, name === active ? (nextPaths[0] ?? WORKSPACES[workspace].entry) : active)
       persist(name)
       schedule(true)
     },
@@ -349,7 +428,7 @@ export function useProject() {
       const nextPaths = Object.keys(nextFiles)
       setPaths(nextPaths)
       const tabs = withPinnedTabs(nextTabs, nextPaths)
-      const activePath = nextFiles[nextActive] != null ? nextActive : tabs[0] ?? 'index.html'
+      const activePath = nextFiles[nextActive] != null ? nextActive : tabs[0] ?? WORKSPACES[workspace].entry
       setOpenTabs(tabs)
       setActive(activePath)
       editorRef.current?.setAll(nextFiles, activePath)
@@ -440,7 +519,7 @@ export function useProject() {
       filesRef.current = nextFiles
       setFolders((prev) => prev.filter((item) => item !== folder && !item.startsWith(prefix)))
       const nextTabs = tabsRef.current.filter((tab) => !tab.startsWith(prefix))
-      const nextActive = activeRef.current.startsWith(prefix) ? 'index.html' : activeRef.current
+      const nextActive = activeRef.current.startsWith(prefix) ? WORKSPACES[workspace].entry : activeRef.current
       commitFiles(nextFiles, nextActive, nextTabs)
       setDialog(null)
     },
@@ -506,8 +585,8 @@ export function useProject() {
       const nextPaths = Object.keys(nextFiles)
       const nextFolders = uniqueFolders(nextPaths.flatMap((path) => parentFolders(path)))
       const entry =
-        nextPaths.find((path) => /(^|\/)main\.(tsx|jsx|ts|js)$/.test(path)) ??
-        nextPaths.find((path) => /(^|\/)App\.(tsx|jsx|ts|js)$/.test(path)) ??
+        nextPaths.find((path) => /(^|\/)main\.(tsx|jsx|ts|js|py|cpp|cc|cxx|go|rs)$/.test(path)) ??
+        nextPaths.find((path) => /(^|\/)(App\.(tsx|jsx|ts|js)|Main\.java|Program\.cs)$/.test(path)) ??
         nextPaths.find((path) => /\.(tsx|jsx|ts|js|html)$/.test(path)) ??
         nextPaths[0]
       const nextTabs = withPinnedTabs([entry], nextPaths)
@@ -529,7 +608,14 @@ export function useProject() {
     [schedule, workspace],
   )
 
-  const run = useCallback(() => schedule(true), [schedule])
+  const run = useCallback(() => {
+    const kind = WORKSPACES[workspace].kind
+    if (kind === 'script' || kind === 'python' || kind === 'lang') {
+      setConsoleOpen(true)
+      setConsoleTab('output')
+    }
+    schedule(true)
+  }, [schedule, workspace])
 
   const importFiles = useCallback(
     (incoming: Incoming[]) => {
@@ -551,11 +637,48 @@ export function useProject() {
     setEntries((prev) => (source ? prev.filter((entry) => entry.source !== source) : []))
   }, [])
 
+  const evalCache = useRef(new Map<string, { ok: boolean; text: string }>())
+
   const evalInPreview = useCallback(
     (code: string) => {
       const trimmed = code.trim()
       if (!trimmed) return
       pushEntry('input', [{ t: 'string', v: trimmed }], 'repl')
+      const info = WORKSPACES[workspace]
+      if (info.kind === 'python') {
+        void import('../lib/runner')
+          .then(({ evalPython, isPythonBusy }) => {
+            if (isPythonBusy()) pushEntry('info', [{ t: 'string', v: 'Queued — the interpreter is still running your script.' }], 'repl')
+            return evalPython(trimmed)
+          })
+          .then((result) => pushEntry(result.ok ? 'result' : 'error', [{ t: 'string', v: result.text }], 'repl'))
+          .catch((error: unknown) => pushEntry('error', [{ t: 'string', v: error instanceof Error ? error.message : String(error) }], 'repl'))
+        return
+      }
+      if (info.kind === 'lang') {
+        const key = `${info.id}:${trimmed.replace(/\s+/g, ' ')}`
+        const cached = evalCache.current.get(key)
+        if (cached) {
+          pushEntry(cached.ok ? 'result' : 'error', [{ t: 'string', v: cached.text }], 'repl')
+          return
+        }
+        pushEntry('info', [{ t: 'string', v: 'Compiling and evaluating on the Wandbox runner…' }], 'repl')
+        void import('../lib/runner')
+          .then(async ({ wrapEval, executeRemote }) => {
+            const source = info.runner ? wrapEval(info.runner, trimmed) : null
+            if (!source) throw new Error(`No expression evaluator for ${info.label}`)
+            return executeRemote({ [info.entry]: source }, info)
+          })
+          .then((result) => {
+            const text = result.compileError.trim() || result.stdout.trim() || result.stderr.trim() || '(no output)'
+            const ok = !result.compileError.trim() && !result.code
+            if (evalCache.current.size > 60) evalCache.current.delete(evalCache.current.keys().next().value as string)
+            evalCache.current.set(key, { ok, text })
+            pushEntry(ok ? 'result' : 'error', [{ t: 'string', v: text }], 'repl')
+          })
+          .catch((error: unknown) => pushEntry('error', [{ t: 'string', v: error instanceof Error ? error.message : String(error) }], 'repl'))
+        return
+      }
       const id = evalId.current++
       const frameEl = iframeRef.current?.contentWindow ?? externalPreviewWindow()
       if (!frameEl) {
@@ -564,7 +687,7 @@ export function useProject() {
       }
       frameEl.postMessage({ channel: 'rp', type: 'eval', id, code: trimmed }, '*')
     },
-    [pushEntry],
+    [pushEntry, workspace],
   )
 
   const revealProblem = useCallback((problem: Problem) => {

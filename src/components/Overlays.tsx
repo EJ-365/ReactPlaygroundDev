@@ -89,10 +89,10 @@ export function DeleteFolderDialog({ path, count, onCancel, onDelete }: { path: 
   )
 }
 
-export function ResetDialog({ onCancel, onReset }: { onCancel: () => void; onReset: () => void }) {
+export function ResetDialog({ name, onCancel, onReset }: { name: string; onCancel: () => void; onReset: () => void }) {
   return (
     <Modal title="Reset project?" onClose={onCancel}>
-      <p className="text-sm leading-6 text-fg/80">This replaces every file with the starter React and Tailwind project.</p>
+      <p className="text-sm leading-6 text-fg/80">This replaces every file with the starter {name} project.</p>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="rounded-full px-3 py-1.5 text-sm text-fg/80 hover:bg-fg/5">Cancel</button>
         <button type="button" onClick={onReset} className="rounded-full bg-rose-400 px-3 py-1.5 text-sm font-semibold text-[#2a0d14]">Reset</button>

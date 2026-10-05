@@ -40,7 +40,7 @@ console.log('script.js ran after React. Root found:', Boolean(document.getElemen
 console.info('Evaluate the preview from the console input below.')
 `
 
-function linkWebFiles(html: string, files: Record<string, string>) {
+function linkWebFiles(html: string, files: Record<string, string>, scriptFile = 'script.js') {
   const local = /<(?:link\b[^>]*\bhref|script\b[^>]*\bsrc)\s*=\s*["'](?![a-z][\w+.-]*:|\/\/)[^"']+["']/i
   if (local.test(html)) return html
   let next = html
@@ -48,9 +48,9 @@ function linkWebFiles(html: string, files: Record<string, string>) {
     const link = '<link rel="stylesheet" href="styles.css" />'
     next = /<\/head>/i.test(next) ? next.replace(/<\/head>/i, `  ${link}\n  </head>`) : `${link}\n${next}`
   }
-  if (files['script.js']?.trim()) {
-    const module = /^\s*(import|export)\s/m.test(files['script.js']) ? ' type="module"' : ''
-    const script = `<script${module} src="script.js"></script>`
+  if (files[scriptFile]?.trim()) {
+    const module = /^\s*(import|export)\s/m.test(files[scriptFile]) ? ' type="module"' : ''
+    const script = `<script${module} src="${scriptFile}"></script>`
     next = /<\/body>/i.test(next) ? next.replace(/<\/body>/i, `  ${script}\n  </body>`) : `${next.replace(/\s*$/, '')}\n${script}\n`
   }
   return next
@@ -67,9 +67,10 @@ function sanitize(files: Record<string, unknown>, workspace: WorkspaceId) {
   }
   if (next['main.tsx'] === LEGACY_MAIN) next['main.tsx'] = DEFAULT_FILES['main.tsx']
   if (next['index.html'] === LEGACY_HTML) next['index.html'] = DEFAULT_FILES['index.html']
-  next['index.html'] = next['index.html'].replace(LEGACY_FOOTER, '')
-  if (workspace === 'web') next['index.html'] = linkWebFiles(next['index.html'], next)
-  if (workspace === 'react' && (next['script.js'] === LEGACY_SCRIPT || next['script.js'] === LEGACY_REACT_SCRIPT)) delete next['script.js']
+  if (typeof next['index.html'] === 'string') next['index.html'] = next['index.html'].replace(LEGACY_FOOTER, '')
+  const kind = WORKSPACES[workspace].kind
+  if (kind === 'web' && typeof next['index.html'] === 'string') next['index.html'] = linkWebFiles(next['index.html'], next, WORKSPACES[workspace].script)
+  if (kind === 'react' && (next['script.js'] === LEGACY_SCRIPT || next['script.js'] === LEGACY_REACT_SCRIPT)) delete next['script.js']
   return next
 }
 

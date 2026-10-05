@@ -8,21 +8,61 @@ import 'monaco-editor/esm/vs/editor/editor.all.js'
 import 'monaco-editor/esm/vs/editor/standalone/browser/quickAccess/standaloneGotoLineQuickAccess.js'
 import 'monaco-editor/esm/vs/editor/standalone/browser/quickAccess/standaloneGotoSymbolQuickAccess.js'
 import 'monaco-editor/esm/vs/editor/standalone/browser/referenceSearch/standaloneReferenceSearch.js'
+import 'monaco-editor/esm/vs/basic-languages/abap/abap.contribution'
+import 'monaco-editor/esm/vs/basic-languages/bat/bat.contribution'
+import 'monaco-editor/esm/vs/basic-languages/bicep/bicep.contribution'
+import 'monaco-editor/esm/vs/basic-languages/clojure/clojure.contribution'
+import 'monaco-editor/esm/vs/basic-languages/coffee/coffee.contribution'
 import 'monaco-editor/esm/vs/basic-languages/css/css.contribution'
 import 'monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution'
 import 'monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution'
+import 'monaco-editor/esm/vs/basic-languages/cypher/cypher.contribution'
+import 'monaco-editor/esm/vs/basic-languages/dart/dart.contribution'
+import 'monaco-editor/esm/vs/basic-languages/dockerfile/dockerfile.contribution'
+import 'monaco-editor/esm/vs/basic-languages/elixir/elixir.contribution'
+import 'monaco-editor/esm/vs/basic-languages/freemarker2/freemarker2.contribution'
+import 'monaco-editor/esm/vs/basic-languages/fsharp/fsharp.contribution'
 import 'monaco-editor/esm/vs/basic-languages/go/go.contribution'
 import 'monaco-editor/esm/vs/basic-languages/graphql/graphql.contribution'
+import 'monaco-editor/esm/vs/basic-languages/handlebars/handlebars.contribution'
+import 'monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution'
+import 'monaco-editor/esm/vs/basic-languages/ini/ini.contribution'
 import 'monaco-editor/esm/vs/basic-languages/java/java.contribution'
+import 'monaco-editor/esm/vs/basic-languages/julia/julia.contribution'
+import 'monaco-editor/esm/vs/basic-languages/kotlin/kotlin.contribution'
 import 'monaco-editor/esm/vs/basic-languages/less/less.contribution'
+import 'monaco-editor/esm/vs/basic-languages/liquid/liquid.contribution'
+import 'monaco-editor/esm/vs/basic-languages/lua/lua.contribution'
 import 'monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution'
+import 'monaco-editor/esm/vs/basic-languages/mips/mips.contribution'
+import 'monaco-editor/esm/vs/basic-languages/objective-c/objective-c.contribution'
+import 'monaco-editor/esm/vs/basic-languages/pascal/pascal.contribution'
+import 'monaco-editor/esm/vs/basic-languages/perl/perl.contribution'
 import 'monaco-editor/esm/vs/basic-languages/php/php.contribution'
+import 'monaco-editor/esm/vs/basic-languages/powershell/powershell.contribution'
+import 'monaco-editor/esm/vs/basic-languages/protobuf/protobuf.contribution'
+import 'monaco-editor/esm/vs/basic-languages/pug/pug.contribution'
 import 'monaco-editor/esm/vs/basic-languages/python/python.contribution'
+import 'monaco-editor/esm/vs/basic-languages/qsharp/qsharp.contribution'
+import 'monaco-editor/esm/vs/basic-languages/r/r.contribution'
+import 'monaco-editor/esm/vs/basic-languages/razor/razor.contribution'
+import 'monaco-editor/esm/vs/basic-languages/restructuredtext/restructuredtext.contribution'
 import 'monaco-editor/esm/vs/basic-languages/ruby/ruby.contribution'
 import 'monaco-editor/esm/vs/basic-languages/rust/rust.contribution'
+import 'monaco-editor/esm/vs/basic-languages/scala/scala.contribution'
+import 'monaco-editor/esm/vs/basic-languages/scheme/scheme.contribution'
 import 'monaco-editor/esm/vs/basic-languages/scss/scss.contribution'
 import 'monaco-editor/esm/vs/basic-languages/shell/shell.contribution'
+import 'monaco-editor/esm/vs/basic-languages/solidity/solidity.contribution'
+import 'monaco-editor/esm/vs/basic-languages/sparql/sparql.contribution'
 import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution'
+import 'monaco-editor/esm/vs/basic-languages/st/st.contribution'
+import 'monaco-editor/esm/vs/basic-languages/swift/swift.contribution'
+import 'monaco-editor/esm/vs/basic-languages/systemverilog/systemverilog.contribution'
+import 'monaco-editor/esm/vs/basic-languages/tcl/tcl.contribution'
+import 'monaco-editor/esm/vs/basic-languages/twig/twig.contribution'
+import 'monaco-editor/esm/vs/basic-languages/vb/vb.contribution'
+import 'monaco-editor/esm/vs/basic-languages/wgsl/wgsl.contribution'
 import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution'
 import 'monaco-editor/esm/vs/basic-languages/html/html.contribution'
@@ -37,6 +77,7 @@ import { DEFAULT_FILES } from '../defaults'
 import { readTailwindConfig } from './config'
 import { REACT_TYPES } from './reactTypes'
 import { registerProjectIntellisense } from './intellisense'
+import { registerLanguageIntellisense } from './langIntellisense'
 import { registerTagRename } from './tagRename'
 import { registerTailwind } from './tailwindService'
 import { monacoThemeData, THEMES } from './themes'
@@ -144,7 +185,7 @@ export function setupMonaco() {
     lib: ['esnext', 'dom', 'dom.iterable'],
   } as monaco.languages.typescript.CompilerOptions
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions(compilerOptions)
-  monaco.languages.typescript.javascriptDefaults.setCompilerOptions({ ...compilerOptions, allowJs: true, checkJs: false })
+  monaco.languages.typescript.javascriptDefaults.setCompilerOptions({ ...compilerOptions, allowJs: true })
   monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
     noSemanticValidation: false,
     noSyntaxValidation: false,
@@ -190,6 +231,7 @@ export function setupMonaco() {
   registerProjectIntellisense(monaco)
   registerTagRename(monaco)
   registerReactSnippets(monaco)
+  registerLanguageIntellisense()
   syncEmmet()
   settingsStore.subscribe(syncEmmet)
   registerTailwind({

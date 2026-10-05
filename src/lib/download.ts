@@ -58,9 +58,35 @@ export function downloadProject(files: Record<string, string>) {
   saveBlob(zipStore(packed), 'react-playground.zip')
 }
 
-export function downloadWebProject(files: Record<string, string>) {
-  const packed = Object.entries(files).map(([path, text]) => pack(`web-project/${path}`, path, path === 'index.html' ? webIndex(text, files) : text))
-  saveBlob(zipStore(packed), 'web-project.zip')
+export async function downloadWebProject(files: Record<string, string>, root = 'web-project') {
+  const scripts = Object.keys(files).filter((path) => /\.tsx?$/.test(path))
+  const compiled = new Map<string, string>()
+  if (scripts.length) {
+    const [{ ensureCompiler }, esbuild] = await Promise.all([import('./compile'), import('esbuild-wasm/esm/browser.js')])
+    await ensureCompiler()
+    for (const path of scripts) {
+      try {
+        const result = await esbuild.transform(files[path], {
+          loader: path.endsWith('.tsx') ? 'tsx' : 'ts',
+          sourcefile: path,
+          target: 'es2022',
+          jsx: 'transform',
+        })
+        compiled.set(path, result.code)
+      } catch {
+        compiled.set(path, files[path])
+      }
+    }
+  }
+  const toJs = (html: string) => html.replace(/(\bsrc\s*=\s*["'][^"']+?)\.tsx?(["'])/gi, '$1.js$2')
+  const packed = Object.entries(files).map(([path, text]) => {
+    const js = compiled.get(path)
+    if (js != null) return pack(`${root}/${path.replace(/\.tsx?$/, '.js')}`, path, js)
+    const isHtml = /\.html?$/i.test(path)
+    const body = isHtml ? toJs(text) : text
+    return pack(`${root}/${path}`, path, isHtml ? (path === 'index.html' ? webIndex(body, files) : body) : text)
+  })
+  saveBlob(zipStore(packed), `${root}.zip`)
 }
 
 function webIndex(userHtml: string, files: Record<string, string>) {
@@ -99,9 +125,9 @@ export function downloadFile(path: string, text: string) {
   saveBlob(blob, path.split('/').pop() || 'file.txt')
 }
 
-export function downloadFiles(files: Record<string, string>, folder = '') {
+export function downloadFiles(files: Record<string, string>, folder = '', name = '') {
   const prefix = folder ? `${folder}/` : ''
-  const root = folder ? folder.split('/').pop()! : 'playground-files'
+  const root = name || (folder ? folder.split('/').pop()! : 'playground-files')
   const packed = Object.entries(files)
     .filter(([path]) => !prefix || path.startsWith(prefix))
     .map(([path, text]) => pack(`${root}/${path.slice(prefix.length)}`, path, text))

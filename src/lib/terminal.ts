@@ -1,7 +1,7 @@
 import { isValidFileName, isValidFolderName, normalizePath } from './files'
 import type { RunHandle, Stream } from './nodeRunner'
 import type { Problem } from '../types'
-import type { WorkspaceId } from './workspace'
+import { WORKSPACES, type WorkspaceId } from './workspace'
 
 export type Tone = 'out' | 'err' | 'muted' | 'dir' | 'ok' | 'accent'
 export type Part = { text: string; tone: Tone }
@@ -49,6 +49,8 @@ export const COMMANDS: Record<string, string> = {
   echo: 'Print text, or write it with > file / >> file',
   code: 'Open a file in the editor',
   node: 'Run a JavaScript or TypeScript file (node script.js, node -e "code")',
+  python: 'Run the Python project in the preview via Pyodide (python, py)',
+  'go/cargo/javac/dotnet/gcc': 'Compile and run the project on the Wandbox runner (in C++/Java/C#/Go/Rust workspaces)',
   npm: 'npm start / npm run dev reloads the preview, npm run build checks for errors',
   history: 'Show previous commands',
   clear: 'Clear the terminal (Ctrl+L)',
@@ -335,8 +337,36 @@ async function runOne(ctx: ShellContext, io: ShellIO, text: string): Promise<num
     case 'exit':
       ctx.close()
       return 0
+    case 'gcc':
+    case 'g++':
+    case 'clang':
+    case 'clang++':
+    case 'javac':
+    case 'java':
+    case 'dotnet':
+    case 'csc':
+    case 'go':
+    case 'cargo':
+    case 'rustc': {
+      const info = WORKSPACES[ctx.workspace]
+      if (info.runner) {
+        io.print(`Running via the Wandbox runner — output lands in the preview output window and the Output tab.`, 'muted')
+        ctx.run()
+        return 0
+      }
+      return fail(`${name}: not available here — switch to the matching workspace, or press Ctrl+Enter to run the preview`)
+    }
     case 'node':
       return runNode(ctx, io, args)
+    case 'python':
+    case 'python3':
+    case 'py': {
+      if (ctx.workspace !== 'python') return fail('python: switch to the Python workspace first (Ctrl+K W)')
+      if (!Object.keys(ctx.files()).some((path) => /\.py$/i.test(path))) return fail('python: no .py file in this project — create main.py')
+      io.print('Running via Pyodide — output lands in the preview output window and the Output tab.', 'muted')
+      ctx.run()
+      return 0
+    }
     case 'npm':
     case 'pnpm':
     case 'yarn':
@@ -427,8 +457,11 @@ async function runNpm(ctx: ShellContext, io: ShellIO, tool: string, args: string
     return 0
   }
   if (command === 'install' || command === 'i' || command === 'add') {
-    if (ctx.workspace === 'react') io.print('Nothing to install: packages you import (import confetti from "canvas-confetti") load automatically from esm.sh.', 'muted')
-    else io.print('Nothing to install: add a <script> or <link> from a CDN in index.html, or use import from "https://esm.sh/<package>" in a module script.', 'muted')
+    const kind = WORKSPACES[ctx.workspace].kind
+    if (kind === 'script' || kind === 'react') io.print('Nothing to install: packages you import (import confetti from "canvas-confetti") load automatically from esm.sh.', 'muted')
+    else if (kind === 'python') io.print('Nothing to install: Pyodide loads the standard library automatically; for PyPI packages add a script that calls micropip.install("pkg").', 'muted')
+    else if (kind === 'web') io.print('Nothing to install: add a <script> or <link> from a CDN in index.html, or use import from "https://esm.sh/<package>" in a module script.', 'muted')
+    else io.print(`Nothing to install: ${WORKSPACES[ctx.workspace].label} projects are plain source files — download them and use your toolchain's package manager locally.`, 'muted')
     return 0
   }
   if (command === 'run' && !script) {

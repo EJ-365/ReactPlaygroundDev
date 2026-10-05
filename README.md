@@ -4,10 +4,11 @@
 
 # Playground
 
-**A VS Code-style frontend editor that runs entirely in your browser.**
+**A VS Code-style coding playground that runs entirely in your browser.**
 
-Write HTML, CSS, JavaScript, TypeScript, React (JSX/TSX) and Tailwind with a live preview, a real
-editor engine, a terminal and an error panel. Nothing to install, no account, and it costs nothing.
+Write HTML, CSS, JavaScript, TypeScript, React (JSX/TSX), Tailwind, Python, C++, Java, C#, Go and
+Rust with a live preview, a real editor engine, a terminal, a REPL and an error panel. Nothing to
+install, no account, and it costs nothing.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-c6ff3d.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/EJ-365/ReactPlagroundDev?style=flat&color=5be1ff)](https://github.com/EJ-365/ReactPlagroundDev/stargazers)
@@ -31,7 +32,8 @@ and you get an editor that behaves like VS Code, with a live preview next to it.
 - **100% free and open source** (MIT). No sign-up, no trial, no paid tier, no ads, no hidden fees.
 - **Private by default.** Your code stays in your browser's local storage. It only leaves your
   device if you share a link or download the project.
-- **The whole frontend stack**, not just React: plain HTML/CSS/JS, TypeScript, JSX/TSX and Tailwind.
+- **The whole frontend stack**, not just React: plain HTML/CSS/JS, TypeScript, JSX/TSX and Tailwind —
+  plus Python (Pyodide, real CPython in WASM) and C++, Java, C#, Go and Rust on the Wandbox runner.
 - **Installable.** Add it to your desktop from Chrome or Edge and it opens in its own window, even offline.
 
 ## Live demo
@@ -40,15 +42,18 @@ and you get an editor that behaves like VS Code, with a live preview next to it.
 
 ## Features
 
-### Two workspaces
+### Workspaces
 
-Switch with the **HTML · CSS · JS | React** toggle in the header (or `Ctrl+K` then `W`).
-Each workspace keeps its own files, open tabs, preview and console.
+Switch with the workspace toggle in the header (or `Ctrl+K` then `W`, which cycles through all
+of them). Each workspace keeps its own files, open tabs, preview and console.
 
 | Workspace | What it runs | Download format |
 | --- | --- | --- |
-| **HTML · CSS · JS** | Plain `index.html` + `styles.css` + `script.js`, no framework. Files load exactly like a real browser: only what `index.html` links with `<link href>` and `<script src>` runs. `defer`, `type="module"` and `import` between your files all work. | A folder you can open straight in a browser |
+| **HTML · CSS · JS** | Plain `index.html` + `styles.css` + `script.js`, no framework. Files load exactly like a real browser: only what `index.html` links with `<link href>` and `<script src>` runs. `defer`, `type="module"` and `import` between your files all work — and a script tag can point at a `.ts`/`.tsx` file too (it's compiled the same way). | A folder you can open straight in a browser (linked `.ts`/`.tsx` scripts are transpiled to `.js` on export) |
+| **TypeScript** | A standalone `main.ts` — no page markup needed. It's bundled and run on every preview refresh; imports between your `.ts` files and npm packages (from esm.sh) work. `node main.ts` in the Terminal runs it on its own. | A `.zip` of the TypeScript sources |
 | **React** | React 19 with JSX/TSX and TypeScript, compiled in the browser with esbuild (WebAssembly). npm packages can be imported by name and are loaded from [esm.sh](https://esm.sh). Tailwind classes work out of the box. | A runnable Vite project |
+| **Python** | A standalone `main.py` that actually runs — [Pyodide](https://pyodide.org) (real CPython in WebAssembly) executes it and `print()` lands in a terminal-style output window (and Output). The interpreter stays loaded, so the Debug Console is a live Python REPL; `python main.py` in the Terminal re-runs it. | A `.zip` of the Python sources |
+| **C++ · Java · C# · Go · Rust** | Single-file workspaces (`main.cpp`, `Main.java`, `Program.cs`, `main.go`, `main.rs`) with IntelliSense-style completions and keyword/snippet suggestions. `Ctrl+Enter` compiles and runs them on [Wandbox](https://wandbox.org) — stdout, stderr and the exit code land in the output window (and Output); the Debug Console evaluates expressions remotely. | A `.zip` of the sources |
 
 ### Editor (powered by Monaco, the engine behind VS Code)
 
@@ -64,13 +69,16 @@ Each workspace keeps its own files, open tabs, preview and console.
   `main#app` add class/id attributes (`className` in JSX/TSX). Ordinary words are left alone;
   custom elements (`my-card`) and capitalized JSX components work too.
 - **Word-based suggestions** on top of the TypeScript, auto-import and Tailwind completions.
+- **Language IntelliSense** for the script workspaces: keyword, builtin and snippet completions for
+  Python, C++, Java, C#, Go and Rust (`sout`, `cw`, `pln`, `iferr`, `main`, `def`, `match`…).
 - **React snippets:** `rfc`, `rfce`, `rafce`, `rfcp`, `us` (useState), `ue`, `uec`, `ur`, `um`,
   `ucb`, `imr`, `imc`, `clg`, `jmap`, `jcond`, `jtern`, `hclick`.
 - **Tags:** auto-close, self-closing tags and auto-rename of the matching tag (each can be turned
   off in Settings).
 - **Attribute values:** choosing `className` inserts `className=""` and choosing `onClick` inserts
   `onClick={}`, with the cursor in the right place.
-- **Unused code is dimmed**, like in VS Code (unused imports and variables).
+- **Unused code is dimmed**, like in VS Code: unused variables, imports and parameters fade, and
+  unreachable code (after `return`, `throw`, etc.) is dimmed too — in TypeScript and JavaScript.
 - **Inlay type hints** in `.ts`/`.tsx` files (hidden in `.js`/`.jsx`, where they don't belong).
 - **Formatting with Prettier** (`Shift+Alt+F`) for HTML, CSS, JS, TS, JSX and TSX, with Format On
   Save and **Format After Delay** (auto-formats when you stop typing) both on by default, plus
@@ -95,22 +103,28 @@ Each workspace keeps its own files, open tabs, preview and console.
   (layout buttons in the panel header, or the `View: Move Panel…` commands):
   - **Problems:** errors and warnings; click one to jump to it.
   - **Output:** what your page's JavaScript logs (`console.log`, warnings, errors).
-  - **Debug Console:** evaluate expressions against the running preview.
+  - **Debug Console:** a REPL for the active workspace — evaluates in the live page for web/React,
+    in the persistent Pyodide interpreter for Python (state is shared with your last run), and as a
+    remote expression eval for the compiled languages.
   - **Terminal:** a browser-based shell for your project files. It supports `ls`, `cd`, `pwd`,
     `tree`, `cat`, `touch`, `mkdir`, `rm`, `mv`, `cp`, `echo` (with `>` and `>>`), `history`,
-    `clear` and `node file.js`, which runs a script in a sandbox and imitates Node.
+    `clear` and `node file.js`, which runs a script in a sandbox and imitates Node. In the language
+    workspaces, toolchain commands work too: `python main.py` runs via Pyodide, and `go run`,
+    `cargo run`, `javac`, `dotnet run`, `g++` and friends all trigger the Wandbox runner.
     (It is not a real Node install, so `npm install` is not available.)
 - **Live preview** that updates as you type, can be refreshed with `Ctrl+Enter` and opened in a
-  separate window. Console output is also mirrored to the browser's DevTools.
+  separate window. For the TypeScript and language workspaces the preview is a terminal-style
+  output window showing what your program prints. Console output is also mirrored to the browser's
+  DevTools.
 - **Font size controls** for the editor (`Ctrl+=`, `Ctrl+-`, `Ctrl+0`, Ctrl+mouse wheel, status bar)
   and separately for the bottom panel.
 - **Hide/show header** (`Ctrl+K` then `H`).
 
 ### Themes and settings
 
-14 color themes with live preview (`Ctrl+K` then `Ctrl+T`): Dark+, Light+, Playground Midnight,
+15 color themes with live preview (`Ctrl+K` then `Ctrl+T`): Dark+, Light+, Playground Midnight,
 One Dark Pro, Dracula, Monokai, GitHub Dark, GitHub Light, Night Owl, Tokyo Night, Catppuccin Mocha,
-Shades of Purple, Solarized Light and High Contrast.
+SynthWave '84, Shades of Purple, Solarized Light and High Contrast.
 
 Settings (`Ctrl+,`) include font family and ligatures, font size, tab size, word wrap, minimap,
 line numbers, cursor style, whitespace rendering, bracket pairs, sticky scroll, auto-closing tags,
@@ -129,11 +143,17 @@ production build).
 - **Download** a single file, a folder, or the whole project (`Ctrl+Alt+S`) as a `.zip`.
 - **Share links:** the share button copies a link with your whole project inside it, so there is
   no server and no account. Whoever opens it gets a copy of your project.
-- **Templates:** React + TypeScript, React Todo App, HTML/CSS/JavaScript, and a Tailwind landing page.
+- **Templates:** React + TypeScript, React Todo App, HTML/CSS/JavaScript, TypeScript Playground,
+  a Tailwind landing page, and starters for Python, C++, Java, C#, Go and Rust.
 - **Images:** PNG, JPG, GIF, WebP, AVIF, ICO and BMP files (up to 1.5 MB) open in a VS Code-style
   image viewer with zoom controls, and render in the preview when referenced from HTML or CSS.
-- Many other file types (Markdown, JSON, SCSS, Vue, Svelte, Python, C/C++, C#, Java, Go, Rust, PHP
-  and more) can be created and edited with highlighting. Only HTML, CSS, JS, TS, JSX and TSX run in the preview.
+- Many other file types — 70+ extensions including Markdown, JSON, SCSS, Vue, Svelte, Python, C/C++,
+  C#, Java, Go, Rust, PHP, Kotlin, Swift, Dart, Lua, R, Perl, Elixir, Julia, Scala, Clojure, F#, VB,
+  Objective-C, Dockerfile, Terraform/HCL, Protobuf, Solidity, Pascal, Scheme, Tcl, Razor,
+  CoffeeScript, Pug, Handlebars, Twig, Liquid, Assembly, WGSL, INI/TOML/.env and more — can be
+  created and opened in their own editor tabs with syntax highlighting and file icons. HTML, CSS,
+  JS, TS, JSX and TSX run in the preview itself; Python runs via Pyodide; C++, Java, C#, Go and Rust
+  run on the Wandbox cloud runner when you press Run. The other types are editable but not runnable.
 
 ### Product site
 
@@ -258,7 +278,12 @@ Share links use the address the app is served from, so links created on your dep
   `react`, `react-dom` and other npm imports are mapped to [esm.sh](https://esm.sh), so an internet
   connection is needed the first time a package is loaded.
 - **Compiling (HTML · CSS · JS):** `index.html` is served as-is, and its `<link>` and `<script>`
-  tags are pointed at your project files.
+  tags are pointed at your project files; `.ts`/`.tsx` scripts are transpiled first.
+- **Compiling (TypeScript):** `main.ts` (or the first `.ts` file) is bundled by esbuild and run in
+  the preview page; logs land in Output.
+- **Compiling (Python):** `main.py` (or the first `.py` file) is executed by Pyodide — real CPython
+  compiled to WebAssembly, downloaded from a CDN on first use. All project `.py` files are written
+  to its filesystem, so imports between your files work.
 - **Preview:** the result runs in a sandboxed iframe. Console calls are forwarded to the Output tab
   and the Debug Console evaluates expressions inside it.
 - **Storage:** projects and settings live in `localStorage`. Share links compress the project into
@@ -347,7 +372,7 @@ On phones the editor works, and the activity bar is replaced by the command pale
 
 - The terminal imitates a shell and Node inside the browser; it cannot run `npm install` or a real dev server.
 - npm packages in the React workspace load from esm.sh, so they need an internet connection the first time.
-- Only HTML, CSS, JS, TS, JSX and TSX run in the preview. Other languages can be edited but not executed.
+- Only HTML, CSS, JS, TS, JSX and TSX run in the preview itself; Python runs in the page via Pyodide. C++, Java, C#, Go and Rust execute on the Wandbox cloud runner when you press Run — that path needs a connection. Other languages can be edited (with syntax highlighting) and downloaded, but not executed.
 - Browser storage has a size limit (usually around 5 MB per site), which is plenty for code but not for large assets.
 
 ## Contributing

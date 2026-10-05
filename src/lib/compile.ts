@@ -6,7 +6,7 @@ import { isImageFile, resolveImport } from './files'
 import { isDataUrl, textToSvgDataUrl } from './media'
 import { buildPreviewDocument, escapeScript, escapeStyle } from './preview'
 import { getTailwind, type TailwindApi } from './tailwindService'
-import type { WorkspaceId } from './workspace'
+import { WORKSPACES, type WorkspaceId, type WorkspaceInfo } from './workspace'
 
 const VIRTUAL_ENTRY = '__entry.tsx'
 let compiler: Promise<void> | null = null
@@ -407,9 +407,81 @@ async function compileWeb(files: Record<string, string>) {
   return { html: document, problems, ok, useCdn: css.useCdn }
 }
 
+const htmlEsc = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** A terminal-style preview page: a program-output window fed by 'pg:line'/'pg:clear' postMessages from the parent. */
+function consolePage(title: string, entry: string, hint: string) {
+  return `<header class="pg-head"><span class="pg-dot" style="background:#f87171"></span><span class="pg-dot" style="background:#fbbf24"></span><span class="pg-dot" style="background:#34d399"></span><span class="pg-title">${htmlEsc(entry)}</span><span class="pg-kind">${htmlEsc(title)}</span></header>
+<div id="pg-out"><div class="pg-line pg-system pg-hint">${htmlEsc(hint)}</div></div>
+<script>
+(() => {
+  const out = document.getElementById('pg-out')
+  const kinds = { log: 'out', debug: 'out', info: 'info', result: 'info', warn: 'warn', error: 'error', system: 'system', input: 'input' }
+  window.addEventListener('message', (event) => {
+    const data = event.data || {}
+    if (data.channel !== 'rp') return
+    if (data.type === 'pg:clear') { out.textContent = ''; return }
+    if (data.type === 'pg:line' && typeof data.text === 'string') {
+      const hint = out.querySelector('.pg-hint')
+      if (hint) hint.remove()
+      const line = document.createElement('div')
+      line.className = 'pg-line pg-' + (kinds[data.level] || 'out')
+      line.textContent = data.text
+      out.appendChild(line)
+      out.scrollTop = out.scrollHeight
+    }
+  })
+})()
+</script>`
+}
+
+const CONSOLE_PAGE_CSS = `:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: #0b1020; color: #e8eaef; font-family: Inter, system-ui, sans-serif; }
+.pg-head { display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+.pg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.pg-title { margin-left: 8px; font: 600 12px ui-monospace, 'Cascadia Mono', monospace; color: #cbd5e1; }
+.pg-kind { margin-left: auto; font-size: 11px; color: #64748b; }
+#pg-out { flex: 1; padding: 12px 14px; overflow: auto; font: 13px/1.7 ui-monospace, 'Cascadia Mono', 'Cascadia Code', Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+.pg-line { margin: 0; }
+.pg-error { color: #f87171; }
+.pg-warn { color: #fbbf24; }
+.pg-info { color: #7dd3fc; }
+.pg-input { color: #a78bfa; }
+.pg-system { color: #64748b; font-style: italic; }
+`
+
+async function compileScript(files: Record<string, string>, info: WorkspaceInfo) {
+  const problems: Problem[] = []
+  const entry = info.entry in files ? info.entry : Object.keys(files).filter((name) => /\.tsx?$/.test(name)).sort()[0]
+  let js = ''
+  if (entry) {
+    const built = await bundleSafe(entry, files)
+    js = built.js
+    problems.push(...built.problems)
+  }
+  const blocking = problems.some((problem) => problem.severity === 'error' && problem.source === 'build')
+  const html = buildPreviewDocument({ html: consolePage('TypeScript', info.entry, 'Output lands here and in the Output tab (Ctrl+J). In the Terminal, node main.ts runs a file on its own.'), css: CONSOLE_PAGE_CSS, appJs: '', vanillaJs: blocking ? '' : js, useCdn: false, plain: true })
+  return { html, problems, ok: !blocking, useCdn: false }
+}
+
+async function compilePython(info: WorkspaceInfo) {
+  const html = buildPreviewDocument({ html: consolePage('Python · Pyodide', info.entry, 'Your Python runs on save — output lands here and in the Output tab (Ctrl+J). The first run downloads the Pyodide runtime from a CDN.'), css: CONSOLE_PAGE_CSS, appJs: '', vanillaJs: '', useCdn: false, plain: true })
+  return { html, problems: [] as Problem[], ok: true, useCdn: false }
+}
+
+async function compileLang(info: WorkspaceInfo) {
+  const html = buildPreviewDocument({ html: consolePage(info.label, info.entry, 'Press Ctrl+Enter or Run to execute on the Wandbox runner — output lands here and in the Output tab (Ctrl+J).'), css: CONSOLE_PAGE_CSS, appJs: '', vanillaJs: '', useCdn: false, plain: true })
+  return { html, problems: [] as Problem[], ok: true, useCdn: false }
+}
+
 export async function compileProject(files: Record<string, string>, workspace: WorkspaceId) {
+  const kind = WORKSPACES[workspace].kind
+  if (kind === 'python') return compilePython(WORKSPACES[workspace])
+  if (kind === 'lang') return compileLang(WORKSPACES[workspace])
   await ensureCompiler()
-  if (workspace === 'web') return compileWeb(files)
+  if (kind === 'web') return compileWeb(files)
+  if (kind === 'script') return compileScript(files, WORKSPACES[workspace])
   const problems: Problem[] = []
   const picked = pickEntry(files)
   let appJs = ''

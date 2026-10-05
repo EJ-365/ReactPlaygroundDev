@@ -144,7 +144,7 @@ function Hero() {
             <span className="font-serif text-[1.08em] font-normal italic tracking-[-0.02em] text-accent">minus the setup.</span>
           </h1>
           <p data-reveal style={delay(160)} className="mt-6 max-w-2xl text-base leading-7 text-muted sm:text-lg sm:leading-8">
-            Playground is a VS Code-style workbench for HTML, CSS, JavaScript, TypeScript, React and Tailwind. Open a tab, start typing, and watch it render. Nothing to install, no account to make, and it never costs a cent.
+            Playground is a VS Code-style workbench for HTML, CSS, JavaScript, TypeScript, React and Tailwind — plus Python, C++, Java, C#, Go and Rust workspaces that really run (Python via Pyodide in your tab, the rest on a cloud code runner), each with a terminal-style output window and a REPL. Open a tab, start typing, and watch it render. Nothing to install, no account to make, and it never costs a cent.
           </p>
           <div data-reveal style={delay(240)} className="mt-8 flex flex-wrap items-center gap-3">
             <a href="#/app" data-testid="hero-launch" className="group flex items-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-accent-fg transition hover:-translate-y-0.5 hover:shadow-[0_10px_40px_-10px_rgb(var(--c-accent))]">
@@ -313,6 +313,20 @@ const STACK: { file: string; label: string }[] = [
   { file: 'data.json', label: 'JSON' },
   { file: 'README.md', label: 'Markdown' },
   { file: 'main.scss', label: 'SCSS' },
+  { file: 'main.py', label: 'Python' },
+  { file: 'main.rs', label: 'Rust' },
+  { file: 'main.go', label: 'Go' },
+  { file: 'Main.java', label: 'Java' },
+  { file: 'app.kt', label: 'Kotlin' },
+  { file: 'main.swift', label: 'Swift' },
+  { file: 'app.dart', label: 'Dart' },
+  { file: 'index.php', label: 'PHP' },
+  { file: 'app.dockerfile', label: 'Dockerfile' },
+  { file: 'main.tf', label: 'Terraform' },
+  { file: 'token.sol', label: 'Solidity' },
+  { file: 'schema.proto', label: 'Protobuf' },
+  { file: 'api.rb', label: 'Ruby' },
+  { file: 'tool.ps1', label: 'PowerShell' },
 ]
 
 function Marquee() {
@@ -451,7 +465,8 @@ function ThemeDemo() {
 const TERMINAL: [string, string][] = [
   ['ls', 'index.html  styles.css  script.js'],
   ['node script.js', 'sum = 42'],
-  ['npm run dev', '✓ preview reloaded'],
+  ['python main.py', 'avg = 89.25'],
+  ['go run main.go', 'hello, runner'],
 ]
 
 function TerminalDemo() {
@@ -535,7 +550,7 @@ function Workbench() {
         <Tile index={1} className="lg:col-span-2" title="15 themes that color everything" body="Dark+, Dracula, Tokyo Night, Catppuccin, SynthWave and more. Every one gives JSX tags their own color.">
           <ThemeDemo />
         </Tile>
-        <Tile index={2} className="lg:col-span-2" title="A terminal for your files" body="ls, cat, touch, mkdir and node script.js, next to Problems, Output and a Debug Console.">
+        <Tile index={2} className="lg:col-span-2" title="A terminal for your files" body="ls, cat, touch, mkdir, node script.js, python main.py — next to Problems, Output and a Debug Console that doubles as a REPL.">
           <TerminalDemo />
         </Tile>
         <Tile index={3} className="lg:col-span-2" title="Errors you can't miss" body="Red squiggles, a red mark on the scrollbar, and a red file in the Explorer with an error count.">
@@ -566,8 +581,8 @@ function Workbench() {
 
 function HowItRuns() {
   const steps = [
-    { tag: 'compile', title: 'esbuild runs in your tab', body: 'TypeScript, JSX and imports are bundled by esbuild compiled to WebAssembly, right inside the page. No build server.' },
-    { tag: 'render', title: 'A sandboxed live preview', body: 'Output renders in an isolated frame next to the editor, with console logs piped to Output and DevTools.' },
+    { tag: 'compile', title: 'esbuild runs in your tab', body: 'TypeScript, JSX and imports are bundled by esbuild compiled to WebAssembly, right inside the page. Python runs on Pyodide (CPython in WASM); C++, Java, C#, Go and Rust run on the Wandbox cloud runner. No build server.' },
+    { tag: 'render', title: 'A sandboxed live preview', body: 'Output renders in an isolated frame next to the editor, with console logs piped to Output — and script/language workspaces get a terminal-style output window plus a Debug Console REPL.' },
     { tag: 'persist', title: 'Saved on your device', body: 'Projects live in your browser storage. Nothing is uploaded unless you choose to share a link.' },
   ]
   return (
@@ -693,10 +708,10 @@ function Creator() {
 
 const FAQ = [
   { q: 'Is it really free?', a: 'Yes. There is no paid plan, no trial, no sign-up and no hidden fees. Playground is open source under the MIT license.' },
-  { q: 'Is it only for React?', a: 'No. Switch the header to HTML · CSS · JS for plain web pages with their own preview, Output and Terminal, or React for components. Each workspace keeps its own files.' },
+  { q: 'Is it only for React?', a: 'No. The header switches between workspaces — HTML · CSS · JS for plain web pages, TypeScript for standalone typed scripts, React for components, plus Python, C++, Java, C#, Go, and Rust, all of which run (Python via Pyodide in your browser; the rest on a cloud code runner) — each with its own files, preview, Output, and Terminal.' },
   { q: 'Where is my code stored?', a: 'In your browser (localStorage). Nothing is uploaded to a server. Download the project or share a link to move it elsewhere.' },
   { q: 'Can I use npm packages?', a: 'Yes. Bare imports such as import confetti from "canvas-confetti" load from esm.sh automatically.' },
-  { q: 'Does it work offline?', a: 'Install it as an app and the editor opens without a connection. Packages from esm.sh need the network the first time.' },
+  { q: 'Does it work offline?', a: 'Install it as an app and the editor opens without a connection. Packages from esm.sh, the first Pyodide download, and the Wandbox runner need the network.' },
   { q: 'Who made it?', a: `${CREATOR.name}, ${CREATOR.role.toLowerCase()}. Questions and ideas are welcome at ${CREATOR.email}.` },
 ]
 

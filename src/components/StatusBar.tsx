@@ -32,7 +32,7 @@ export function StatusBar({ onTheme, errors, warnings, onProblems, unsaved, onSa
         {settings.autoSave && <Check size={11} />}
         Auto Save: {settings.autoSave ? 'On' : 'Off'}
       </button>
-      <span className="hidden sm:inline">{workspaceStore.get() === 'web' ? 'HTML · CSS · JS' : 'React · Vite'}</span>
+      <span className="hidden sm:inline">{workspaceStore.info().status}</span>
       <button type="button" className="ml-auto hidden rounded px-1 hover:bg-black/10 md:inline" title="Change color theme (Ctrl+K Ctrl+T)" onClick={onTheme}>{theme}</button>
       <span className="font-mono">Ln {snap.line}, Col {snap.column}</span>
       <span className="hidden font-mono sm:inline">{snap.language}</span>

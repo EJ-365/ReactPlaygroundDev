@@ -242,3 +242,98 @@ export const WEB_FILES: Record<string, string> = {
 export const WEB_TABS = ['index.html', 'styles.css', 'script.js']
 
 export const WEB_ACTIVE = 'index.html'
+
+const TS_MAIN = `type Note = { id: number; text: string }
+
+const notes: Note[] = [
+  { id: 1, text: 'Edit main.ts — the preview runs it and logs land in Output (Ctrl+J)' },
+  { id: 2, text: 'Press Ctrl+Enter to re-run, or node main.ts in the Terminal' },
+]
+
+function render(items: Note[]): number {
+  for (const item of items) console.log(\`#\${item.id} \${item.text}\`)
+  return items.length
+}
+
+const total = render(notes)
+console.info(\`Printed \${total} note\${total === 1 ? '' : 's'}\`)
+`
+
+export const TS_FILES: Record<string, string> = {
+  'main.ts': TS_MAIN,
+}
+
+export const TS_TABS = ['main.ts']
+
+export const TS_ACTIVE = 'main.ts'
+
+const PY_MAIN = `def fib(n: int) -> int:
+    return n if n < 2 else fib(n - 1) + fib(n - 2)
+
+
+for i in range(10):
+    print(f"fib({i}) = {fib(i)}")
+
+print("Runs in the browser via Pyodide — edit main.py and the preview re-runs it")
+`
+
+const CPP_MAIN = `#include <iostream>
+#include <string>
+#include <vector>
+
+int main() {
+    std::vector<std::string> notes = {"Edit main.cpp", "Press Ctrl+Enter to run"};
+    for (const auto& note : notes) std::cout << "• " << note << '\\n';
+    return 0;
+}
+`
+
+const JAVA_MAIN = `import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        List.of("Edit Main.java", "Press Ctrl+Enter to run")
+            .forEach(note -> System.out.println("• " + note));
+    }
+}
+`
+
+const CSHARP_MAIN = `using System;
+using System.Collections.Generic;
+
+class Program {
+    static void Main() {
+        var notes = new List<string> { "Edit Program.cs", "Press Ctrl+Enter to run" };
+        foreach (var note in notes) Console.WriteLine("• " + note);
+    }
+}
+`
+
+const GO_MAIN = `package main
+
+import "fmt"
+
+func main() {
+	for _, note := range []string{"Edit main.go", "Press Ctrl+Enter to run"} {
+		fmt.Println("•", note)
+	}
+}
+`
+
+const RUST_MAIN = `fn main() {
+    for note in ["Edit main.rs", "Press Ctrl+Enter to run"] {
+        println!("• {note}");
+    }
+}
+`
+
+export function singleFileProject(entry: string, source: string) {
+  return { files: { [entry]: source }, openTabs: [entry], active: entry, folders: [] }
+}
+
+export const PY_PROJECT = () => singleFileProject('main.py', PY_MAIN)
+export const CPP_PROJECT = () => singleFileProject('main.cpp', CPP_MAIN)
+export const JAVA_PROJECT = () => singleFileProject('Main.java', JAVA_MAIN)
+export const CSHARP_PROJECT = () => singleFileProject('Program.cs', CSHARP_MAIN)
+export const GO_PROJECT = () => singleFileProject('main.go', GO_MAIN)
+export const RUST_PROJECT = () => singleFileProject('main.rs', RUST_MAIN)

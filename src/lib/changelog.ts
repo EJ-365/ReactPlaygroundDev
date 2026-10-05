@@ -5,9 +5,23 @@ export type ChangeEntry = {
   items: string[]
 }
 
-export const APP_VERSION = '1.1.0'
+export const APP_VERSION = '1.2.0'
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '1.2.0',
+    date: '2026-10-04',
+    title: 'TypeScript workspace, dimmed dead code, more languages',
+    items: [
+      'New TypeScript workspace: a standalone main.ts tab with full type-checking — bundled and run in the preview, or via node main.ts in the Terminal. Pick it in the header or let Ctrl+K W cycle through all workspaces',
+      'Language workspaces in the header — Python runs locally via Pyodide (real CPython in WASM, print() lands in Output), and C++, Java, C#, Go, and Rust compile and run on the Wandbox cloud runner when you press Run; all six ship keyword/snippet IntelliSense and starter templates',
+      'Script and language workspaces get a terminal-style output window as their preview, and the Debug Console is a live REPL — real Python state via Pyodide, expression eval for the compiled languages via Wandbox',
+      'Unused variables, imports, parameters, and unreachable code are dimmed in JavaScript files too, matching VS Code (they were already dimmed in TypeScript)',
+      'Downloading an HTML · CSS · JS project transpiles any linked .ts/.tsx files to .js and rewrites the <script> tags, so the exported folder opens straight in a browser',
+      'Editor tabs with syntax highlighting and file icons for 70+ file types: Objective-C, Kotlin, Swift, Dart, Lua, R, Perl, Elixir, Julia, Scala, Clojure, F#, VB, PowerShell, Batch, Dockerfile, Terraform/HCL, Protobuf, Solidity, Pascal, Scheme, Tcl, Razor, CoffeeScript, Pug, Handlebars, Twig, Liquid, Assembly, WGSL, INI/TOML/.env, and more',
+      'New templates: TypeScript Playground plus Python, C++, Java, C#, Go, and Rust starters',
+    ],
+  },
   {
     version: '1.1.0',
     date: '2026-10-03',

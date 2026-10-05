@@ -30,6 +30,42 @@ const LESSONS: Lesson[] = [
     ],
   },
   {
+    id: 'typescript',
+    icon: 'main.ts',
+    title: 'Try standalone TypeScript',
+    time: '3 min',
+    summary: 'A single typed script — no page markup needed.',
+    steps: [
+      <>Click <strong>TypeScript</strong> in the header (or press <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> <Kbd>W</Kbd> until it lights up). This workspace is just <code>main.ts</code> — it runs and prints to the preview output window, and full type-checking is on.</>,
+      <>
+        Edit <code>main.ts</code> — types, generics, and interfaces all work:
+        <Code>{`type User = { name: string; admin?: boolean }
+
+const greet = (user: User): string => \`Hello \${user.name}\`
+console.log(greet({ name: 'Ada', admin: true }))`}</Code>
+      </>,
+      <>Logs land in <strong>Output</strong> (<Kbd>Ctrl</Kbd> <Kbd>J</Kbd>) and the code re-runs as you type. You can also run <code>node main.ts</code> in the <strong>Terminal</strong>, or <code>import</code> helpers from other <code>.ts</code> files and npm packages.</>,
+    ],
+  },
+  {
+    id: 'python',
+    icon: 'main.py',
+    title: 'Run Python in the browser',
+    time: '3 min',
+    summary: 'Real CPython via Pyodide — WASM, no install.',
+    steps: [
+      <>Click <strong>Python</strong> in the header (or press <Kbd>Ctrl</Kbd> <Kbd>K</Kbd> <Kbd>W</Kbd> until it lights up). This workspace is just <code>main.py</code>.</>,
+      <>
+        Edit <code>main.py</code> — the full standard library works:
+        <Code>{`from statistics import mean
+
+scores = [88, 92, 75, 100]
+print(f"average: {mean(scores)}")`}</Code>
+      </>,
+      <>Pyodide (CPython compiled to WebAssembly — the first run downloads the runtime from a CDN) executes it and the interpreter stays loaded: <code>print()</code> lands in the preview output window and <strong>Output</strong> (<Kbd>Ctrl</Kbd> <Kbd>J</Kbd>), the <strong>Debug Console</strong> is a live Python REPL, extra <code>.py</code> files import normally, and <code>python main.py</code> in the Terminal re-runs it. C++, Java, C#, Go, and Rust get their own workspaces too — <Kbd>Ctrl</Kbd> <Kbd>Enter</Kbd> runs them on the Wandbox runner and shows the output the same way.</>,
+    ],
+  },
+  {
     id: 'react',
     icon: 'App.tsx',
     title: 'Build a React component',
@@ -75,7 +111,7 @@ export function Counter({ start = 0 }: { start?: number }) {
       <>A single folder opens like <em>Open Folder</em> in VS Code: its structure becomes the project, its name becomes the Explorer root, and the preview runs it right away.</>,
       <><code>node_modules</code>, <code>.git</code>, and build folders are skipped, along with text files over 250 KB. Images (PNG, JPG, GIF, WebP…) up to 1.5 MB are imported and open in the image viewer; other binary files are skipped.</>,
       <>If a file already exists you are asked before it is replaced. Uploaded loose files merge into the current project.</>,
-      <>Upload into the matching workspace: React projects need <code>main.tsx</code>/<code>main.jsx</code> or <code>App.tsx</code> (a <code>src/</code> layout works too); plain pages use <code>index.html</code>, <code>styles.css</code>, and <code>script.js</code> in HTML · CSS · JS.</>,
+      <>Upload into the matching workspace: React projects need <code>main.tsx</code>/<code>main.jsx</code> or <code>App.tsx</code> (a <code>src/</code> layout works too); plain pages use <code>index.html</code>, <code>styles.css</code>, and <code>script.js</code> in HTML · CSS · JS; standalone scripts use <code>main.ts</code> in TypeScript; Python uses <code>main.py</code>, C++ <code>main.cpp</code>, Java <code>Main.java</code>, C# <code>Program.cs</code>, Go <code>main.go</code>, and Rust <code>main.rs</code>.</>,
     ],
   },
   {
@@ -85,7 +121,7 @@ export function Counter({ start = 0 }: { start?: number }) {
     time: '3 min',
     summary: 'Turn your playground into a real Vite project.',
     steps: [
-      <>Click the download icon in the header or press <Kbd>Ctrl</Kbd> <Kbd>Alt</Kbd> <Kbd>S</Kbd>. In HTML · CSS · JS you get a folder you can open straight in a browser; the steps below are for React.</>,
+      <>Click the download icon in the header or press <Kbd>Ctrl</Kbd> <Kbd>Alt</Kbd> <Kbd>S</Kbd>. In HTML · CSS · JS you get a folder you can open straight in a browser (linked <code>.ts</code> scripts are compiled to <code>.js</code> on export); TypeScript and the language workspaces download their sources as a <code>.zip</code>; the steps below are for React.</>,
       <>
         Unzip it and run:
         <Code>{`npm install

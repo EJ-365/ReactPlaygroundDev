@@ -1,4 +1,4 @@
-import { DEFAULT_ACTIVE, DEFAULT_FILES, DEFAULT_TABS, WEB_FILES } from '../defaults'
+import { CPP_PROJECT, CSHARP_PROJECT, DEFAULT_ACTIVE, DEFAULT_FILES, DEFAULT_TABS, GO_PROJECT, JAVA_PROJECT, PY_PROJECT, RUST_PROJECT, TS_ACTIVE, TS_FILES, TS_TABS, WEB_FILES } from '../defaults'
 import type { SavedProject } from './storage'
 import type { WorkspaceId } from './workspace'
 
@@ -144,6 +144,67 @@ export const TEMPLATES: Template[] = [
       active: 'index.html',
       folders: [],
     }),
+  },
+  {
+    id: 'typescript',
+    name: 'TypeScript Playground',
+    description: 'A standalone main.ts with full type-checking. Runs in the preview and the Terminal — no page markup needed.',
+    stack: ['TypeScript', 'Console'],
+    workspace: 'ts',
+    project: () => ({
+      files: { ...TS_FILES },
+      openTabs: [...TS_TABS],
+      active: TS_ACTIVE,
+      folders: [],
+    }),
+  },
+  {
+    id: 'python',
+    name: 'Python Playground',
+    description: 'main.py executed by Pyodide — real CPython in WASM. print() lands in Output, stdlib and multi-file imports work.',
+    stack: ['Python', 'Pyodide'],
+    workspace: 'python',
+    project: PY_PROJECT,
+  },
+  {
+    id: 'cpp',
+    name: 'C++ Starter',
+    description: 'A main.cpp with IntelliSense and one-click cloud execution — output lands in the Output tab.',
+    stack: ['C++', 'Runner'],
+    workspace: 'cpp',
+    project: CPP_PROJECT,
+  },
+  {
+    id: 'java',
+    name: 'Java Starter',
+    description: 'A Main.java with IntelliSense and one-click cloud execution — output lands in the Output tab.',
+    stack: ['Java', 'Runner'],
+    workspace: 'java',
+    project: JAVA_PROJECT,
+  },
+  {
+    id: 'csharp',
+    name: 'C# Starter',
+    description: 'A Program.cs with IntelliSense and one-click cloud execution — output lands in the Output tab.',
+    stack: ['C#', 'Runner'],
+    workspace: 'csharp',
+    project: CSHARP_PROJECT,
+  },
+  {
+    id: 'go',
+    name: 'Go Starter',
+    description: 'A main.go with IntelliSense and one-click cloud execution — output lands in the Output tab.',
+    stack: ['Go', 'Runner'],
+    workspace: 'go',
+    project: GO_PROJECT,
+  },
+  {
+    id: 'rust',
+    name: 'Rust Starter',
+    description: 'A main.rs with IntelliSense and one-click cloud execution — output lands in the Output tab.',
+    stack: ['Rust', 'Runner'],
+    workspace: 'rust',
+    project: RUST_PROJECT,
   },
   {
     id: 'landing',

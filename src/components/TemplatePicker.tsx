@@ -1,8 +1,9 @@
 import { X } from 'lucide-react'
 import type { Template } from '../lib/templates'
+import { WORKSPACES } from '../lib/workspace'
 import { FileIcon } from './FileIcon'
 
-const ICON: Record<string, string> = { react: 'App.tsx', todo: 'App.jsx', vanilla: 'index.html', landing: 'styles.css' }
+const ICON: Record<string, string> = { react: 'App.tsx', todo: 'App.jsx', vanilla: 'index.html', typescript: 'main.ts', python: 'main.py', cpp: 'main.cpp', java: 'Main.java', csharp: 'Program.cs', go: 'main.go', rust: 'main.rs', landing: 'styles.css' }
 
 export function TemplatePicker({ templates, onPick, onCancel }: { templates: Template[]; onPick: (template: Template) => void; onCancel: () => void }) {
   return (
@@ -14,7 +15,7 @@ export function TemplatePicker({ templates, onPick, onCancel }: { templates: Tem
             <X size={16} />
           </button>
         </div>
-        <p className="mb-4 text-xs text-muted">Each template opens in its workspace (HTML/CSS/JS or React) and replaces that workspace's files. Download your current project first if you want to keep it.</p>
+        <p className="mb-4 text-xs text-muted">Each template opens in its workspace (HTML/CSS/JS, TypeScript, or React) and replaces that workspace's files. Download your current project first if you want to keep it.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {templates.map((template) => (
             <button
@@ -27,7 +28,7 @@ export function TemplatePicker({ templates, onPick, onCancel }: { templates: Tem
               <span className="flex items-center gap-2 text-sm font-semibold text-fg">
                 <FileIcon path={ICON[template.id] ?? 'index.html'} size={18} />
                 {template.name}
-                <span className="ml-auto rounded-full bg-fg/10 px-2 py-0.5 text-[10px] font-medium text-muted">{template.workspace === 'web' ? 'HTML/CSS/JS' : 'React'}</span>
+                <span className="ml-auto rounded-full bg-fg/10 px-2 py-0.5 text-[10px] font-medium text-muted">{WORKSPACES[template.workspace].label.replaceAll(' · ', '/')}</span>
               </span>
               <span className="text-xs leading-5 text-muted">{template.description}</span>
               <span className="mt-auto flex flex-wrap gap-1">

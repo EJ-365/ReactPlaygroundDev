@@ -12,7 +12,7 @@ import { statusStore } from '../lib/statusStore'
 import { saveProject } from '../lib/storage'
 import { TEMPLATES, type Template } from '../lib/templates'
 import { fromDataTransfer, fromFileList, type UploadResult } from '../lib/upload'
-import { WORKSPACES, workspaceStore, type WorkspaceId } from '../lib/workspace'
+import { WORKSPACE_IDS, WORKSPACES, workspaceStore, type WorkspaceId } from '../lib/workspace'
 import type { FileProblems, MobilePane } from '../types'
 import { ActivityBar, type SideView } from './ActivityBar'
 import { Breadcrumbs } from './Breadcrumbs'
@@ -263,7 +263,10 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
       else if (name === 'tour') setTour(true)
       else if (name === 'themes') setPanel('themes')
       else if (name === 'shortcuts') setPanel('shortcuts')
-      else if (name === 'workspace') switchRef.current(workspaceStore.get() === 'web' ? 'react' : 'web')
+      else if (name === 'workspace') {
+        const ids = WORKSPACE_IDS
+        switchRef.current(ids[(ids.indexOf(workspaceStore.get()) + 1) % ids.length])
+      }
       else if (name === 'run') actions.current.run()
       else if (name === 'reveal-explorer') {
         setView('explorer')
@@ -432,12 +435,15 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
     if (!openExternalPreview(project.previewHtml)) statusStore.setNotice('Allow pop-ups to open the preview')
   }
   const download = () => {
-    if (project.workspace === 'web') {
-      downloadWebProject(project.getFiles())
-      statusStore.flash('Downloaded web-project.zip')
-    } else {
+    const info = WORKSPACES[project.workspace]
+    if (info.kind === 'web') {
+      void downloadWebProject(project.getFiles(), info.root).then(() => statusStore.flash(`Downloaded ${info.root}.zip`))
+    } else if (info.kind === 'react') {
       downloadProject(project.getFiles())
       statusStore.flash('Downloaded project as a runnable Vite app')
+    } else {
+      downloadFiles(project.getFiles(), '', info.root)
+      statusStore.flash(`Downloaded ${info.root}.zip`)
     }
   }
   const switchWorkspace = (next: WorkspaceId) => {
@@ -469,9 +475,9 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
     { id: 'save', label: 'File: Save', hint: 'Ctrl+S', run: () => void saveNow() },
     { id: 'autosave', label: `File: Toggle Auto Save (${settingsStore.get().autoSave ? 'on' : 'off'})`, run: () => settingsStore.update({ autoSave: !settingsStore.get().autoSave }) },
     { id: 'download-file', label: 'File: Download Current File', run: () => downloadPath(project.active) },
-    ...(project.workspace === 'react' ? [{ id: 'download-sources', label: 'File: Download Source Files (.zip)', run: () => downloadFolder('') }] : []),
+    ...(WORKSPACES[project.workspace].kind !== 'web' ? [{ id: 'download-sources', label: 'File: Download Source Files (.zip)', run: () => downloadFolder('') }] : []),
     { id: 'templates', label: 'File: New Project from Template…', run: () => setTemplates(true) },
-    ...(['web', 'react'] as const).filter((id) => id !== project.workspace).map((id) => ({ id: `workspace-${id}`, label: `Workspace: Switch to ${WORKSPACES[id].label}`, hint: 'Ctrl+K W', run: () => switchWorkspace(id) })),
+    ...WORKSPACE_IDS.filter((id) => id !== project.workspace).map((id) => ({ id: `workspace-${id}`, label: `Workspace: Switch to ${WORKSPACES[id].label}`, hint: 'Ctrl+K W', run: () => switchWorkspace(id) })),
     { id: 'terminal', label: 'View: Toggle Terminal', hint: 'Ctrl+`', run: () => { project.setConsoleTab('terminal'); project.setConsoleOpen(true); project.setMobilePane('console') } },
     { id: 'output', label: 'View: Show Output', run: () => { project.setConsoleTab('output'); project.setConsoleOpen(true); project.setMobilePane('console') } },
     { id: 'debug-console', label: 'View: Show Debug Console', run: () => { project.setConsoleTab('debug'); project.setConsoleOpen(true); project.setMobilePane('console') } },
@@ -915,7 +921,7 @@ export function Playground({ suspended = false }: { suspended?: boolean }) {
           }}
         />
       )}
-      {project.dialog?.type === 'reset' && <ResetDialog onCancel={() => project.setDialog(null)} onReset={project.reset} />}
+      {project.dialog?.type === 'reset' && <ResetDialog name={WORKSPACES[project.workspace].label} onCancel={() => project.setDialog(null)} onReset={project.reset} />}
       {project.paletteOpen && (
         <CommandPalette
           files={project.paths}

@@ -1,6 +1,6 @@
 import { isValidFileName, isValidFolderName } from './files'
 import { loadProject, saveProject, type SavedProject } from './storage'
-import { WORKSPACES, workspaceStore, type WorkspaceId } from './workspace'
+import { isWorkspaceId, WORKSPACES, workspaceStore, type WorkspaceId } from './workspace'
 
 const PREFIX = '#code/'
 
@@ -58,7 +58,7 @@ async function readShared(hash: string): Promise<{ project: SavedProject; worksp
   }
   const paths = Object.keys(files)
   if (!paths.length) return null
-  const workspace: WorkspaceId = data.workspace === 'web' ? 'web' : 'react'
+  const workspace: WorkspaceId = isWorkspaceId(data.workspace) ? data.workspace : 'react'
   const fallback = WORKSPACES[workspace].defaults().active
   const active = typeof data.active === 'string' && files[data.active] != null ? data.active : files[fallback] != null ? fallback : paths[0]
   const folders = Array.isArray(data.folders) ? data.folders.filter((folder): folder is string => typeof folder === 'string' && isValidFolderName(folder)) : []
